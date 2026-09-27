@@ -1,0 +1,54 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #35372f;
+  background: #f8f5ef;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 320px; margin: 0; }
+a { color: inherit; }
+a:focus-visible { outline: 2px solid #827355; outline-offset: 4px; }
+.skip-link { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 2; padding: 0.75rem 1rem; background: #fff; transform: translateY(-150%); }
+.skip-link:focus { transform: translateY(0); }
+.site-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem clamp(1rem, 5vw, 4rem); border-bottom: 1px solid #e7e1d6; background: rgb(248 245 239 / 95%); backdrop-filter: blur(12px); }
+.site-header__brand { flex: 0 0 auto; font-family: Georgia, serif; font-size: 1.15rem; letter-spacing: 0.04em; text-decoration: none; }
+.site-header__brand span { color: #a38d67; font-size: 0.8em; }
+.site-header nav { min-width: 0; }
+.site-nav { display: flex; gap: 0.95rem; overflow-x: auto; margin: 0; padding: 0.25rem 0.15rem; list-style: none; scrollbar-width: thin; }
+.site-nav a { color: #5b5d55; font-size: 0.78rem; text-decoration: none; white-space: nowrap; }
+.site-nav a:hover, .text-link:hover { color: #8a7451; }
+.hero { display: grid; min-height: min(76vh, 720px); place-content: center; justify-items: center; padding: 5rem 1.25rem; text-align: center; }
+.eyebrow { margin: 0 0 1rem; color: #8a7451; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; }
+h1, h2 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; }
+h1 { max-width: 12ch; font-size: clamp(3rem, 12vw, 7rem); line-height: 1.05; }
+.hero__names { margin: 1.8rem 0 0.25rem; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1.25rem, 4vw, 1.8rem); }
+.hero__date { margin: 0; color: #74756e; font-size: 0.9rem; }
+.text-link { margin-top: 3rem; color: #5b5d55; font-size: 0.78rem; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
+.sections { border-top: 1px solid #e7e1d6; }
+.content-section { display: grid; min-height: 19rem; place-items: center; padding: 4.5rem 1.25rem; text-align: center; }
+.content-section--soft { background: #f0ece3; }
+.content-section__inner { max-width: 42rem; }
+h2 { font-size: clamp(2rem, 7vw, 3.4rem); }
+.placeholder-copy { margin: 1rem 0 0; color: #74756e; line-height: 1.7; }
+.footer { padding: 2rem 1rem; border-top: 1px solid #e7e1d6; color: #74756e; font-size: 0.8rem; text-align: center; }
+.footer p { margin: 0; }
+
+@media (min-width: 760px) {
+  .site-header { padding-block: 1rem; }
+  .site-nav { gap: clamp(1rem, 2vw, 2rem); }
+  .site-nav a { font-size: 0.84rem; }
+  .hero { min-height: min(82vh, 820px); }
+  .content-section { min-height: 24rem; padding: 6rem 2rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { scroll-behavior: auto; }
+}
