@@ -7,10 +7,10 @@ import { SectionHeading } from './components/SectionHeading'
 import { coupleDisplayName, coupleFullNames, wedding } from './content/wedding'
 
 const eventDetails = [
-  { label: 'Date', value: wedding.date.display },
-  { label: 'Ceremony', value: wedding.ceremonyTime },
-  { label: 'Reception', value: wedding.receptionTime },
-  { label: 'Location', value: `${wedding.venue.room}, ${wedding.venue.hotel}` },
+  { label: wedding.date.label, value: wedding.date.display, dateTime: wedding.date.iso },
+  { label: wedding.schedule.ceremony.label, value: wedding.schedule.ceremony.time },
+  { label: wedding.schedule.reception.label, value: wedding.schedule.reception.time },
+  { label: wedding.venue.label, value: `${wedding.venue.room}, ${wedding.venue.hotel}` },
 ]
 
 export default function App() {
@@ -54,12 +54,12 @@ export default function App() {
 
         <section className="details" id="details" aria-labelledby="details-title">
           <div className="section-shell details__inner">
-            <SectionHeading eyebrow="The celebration" title="Wedding details" id="details-title" align="center" />
+            <SectionHeading eyebrow="The celebration" title={wedding.detailsTitle} id="details-title" align="center" />
             <dl className="details-grid">
               {eventDetails.map((detail) => (
                 <div className="detail" key={detail.label}>
                   <dt>{detail.label}</dt>
-                  <dd>{detail.value}</dd>
+                  <dd>{'dateTime' in detail ? <time dateTime={detail.dateTime}>{detail.value}</time> : detail.value}</dd>
                 </div>
               ))}
             </dl>

@@ -10,12 +10,23 @@ export const wedding = {
     },
   },
   date: {
+    label: 'Date',
     iso: '2026-12-28',
     display: '28 December 2026',
   },
-  ceremonyTime: 'Time to be confirmed',
-  receptionTime: 'Time to be confirmed',
+  detailsTitle: 'Wedding details',
+  schedule: {
+    ceremony: {
+      label: 'Guest Arrival',
+      time: '9.00am',
+    },
+    reception: {
+      label: 'Poruwa Ceremony',
+      time: '9.45am',
+    },
+  },
   venue: {
+    label: 'Location',
     room: 'The Oak Room',
     hotel: 'Cinnamon Grand Colombo',
     website: 'https://www.cinnamonhotels.com/cinnamon-grand-colombo/weddings-and-events/the-oak-room',
