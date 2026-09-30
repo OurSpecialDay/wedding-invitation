@@ -2,9 +2,7 @@ import { useRef, useState } from 'react'
 import { coupleDisplayName } from '../content/wedding'
 
 const links = [
-  { href: '#story', label: 'Our story' },
   { href: '#details', label: 'The day' },
-  { href: '#gallery', label: 'Gallery' },
 ]
 
 export function Header() {

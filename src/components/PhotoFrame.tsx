@@ -3,13 +3,15 @@ type PhotoFrameProps = {
   className?: string
   src?: string
   alt?: string
+  loading?: 'eager' | 'lazy'
+  fetchPriority?: 'high' | 'low' | 'auto'
 }
 
-export function PhotoFrame({ label, className = '', src, alt }: PhotoFrameProps) {
+export function PhotoFrame({ label, className = '', src, alt, loading = 'lazy', fetchPriority }: PhotoFrameProps) {
   return (
     <figure className={`photo-frame ${className}`}>
       {src ? (
-        <img src={src} alt={alt ?? label} loading="lazy" />
+        <img src={src} alt={alt ?? label} loading={loading} fetchPriority={fetchPriority} />
       ) : (
         <div className="photo-frame__placeholder" role="img" aria-label={`${label}: placeholder image, replace with your own photograph`}>
           <span className="photo-frame__mark" aria-hidden="true">✳</span>
