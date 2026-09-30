@@ -58,7 +58,7 @@ export default function App() {
             <div className="details__feature">
               <img
                 className="details__image scroll-reveal scroll-reveal--image"
-                src={`${import.meta.env.BASE_URL}images/our-story.jpeg`}
+                src={`${import.meta.env.BASE_URL}images/wedding-details.jpeg`}
                 alt="A photograph from our story"
               />
               <div className="details__copy scroll-reveal scroll-reveal--delay-1">
