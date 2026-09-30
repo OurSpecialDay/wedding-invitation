@@ -10,24 +10,24 @@ export function GalleryPreview() {
       <div className="gallery-grid">
         <PhotoFrame
           label="Gallery photograph one"
-          className="gallery-grid__item gallery-grid__item--one"
+          className="gallery-grid__item gallery-grid__item--one scroll-reveal scroll-reveal--image"
           src={`${import.meta.env.BASE_URL}images/gallery-1.jpeg`}
           alt="Gallery photograph one"
         />
         <PhotoFrame
           label="Gallery photograph two"
-          className="gallery-grid__item gallery-grid__item--two"
+          className="gallery-grid__item gallery-grid__item--two scroll-reveal scroll-reveal--image scroll-reveal--delay-1"
           src={`${import.meta.env.BASE_URL}images/gallery-2.jpeg`}
           alt="Gallery photograph two"
         />
         <PhotoFrame
           label="Gallery photograph three"
-          className="gallery-grid__item gallery-grid__item--three"
+          className="gallery-grid__item gallery-grid__item--three scroll-reveal scroll-reveal--image scroll-reveal--delay-2"
           src={`${import.meta.env.BASE_URL}images/gallery-3.jpeg`}
           alt="Gallery photograph three"
         />
       </div>
-      <a className="text-link" href="#rsvp">Celebrate with us <span aria-hidden="true">→</span></a>
+      <a className="text-link scroll-reveal scroll-reveal--delay-2" href="#rsvp">Celebrate with us <span aria-hidden="true">→</span></a>
     </section>
   )
 }
