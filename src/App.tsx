@@ -4,7 +4,6 @@ import { CouplePhoto } from './components/CouplePhoto'
 import { Header } from './components/Header'
 import { LoveStory } from './components/LoveStory'
 import { RSVPCallToAction } from './components/RSVPCallToAction'
-import { ScrollIndicator } from './components/ScrollIndicator'
 import { coupleFullNames, wedding } from './content/wedding'
 
 export default function App() {
@@ -48,7 +47,6 @@ export default function App() {
             <a className="button button--primary hero__entrance hero__entrance--7" href="#rsvp">RSVP</a>
           </div>
           <CouplePhoto />
-          <ScrollIndicator />
         </section>
 
         <LoveStory />
