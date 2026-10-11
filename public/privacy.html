@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="index,follow">
+    <meta name="description" content="How the wedding invitation website handles visitor and RSVP information.">
+    <meta name="theme-color" content="#f8f7f2">
+    <link rel="icon" type="image/png" href="./favicon.png">
+    <title>Privacy policy | Thushara &amp; Dakshin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      :root { color-scheme: light; --paper: #f8f7f2; --ink: #2e3028; --muted: #73766d; --line: #dedfd6; --sage: #71816c; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font: 1rem/1.7 "DM Sans", sans-serif; }
+      .privacy { width: min(100% - 2rem, 48rem); margin: 0 auto; padding: 2rem 0 4rem; }
+      .privacy__brand { display: block; color: var(--ink); font: 1.5rem/1.2 "Cormorant Garamond", serif; text-align: center; text-decoration: none; }
+      .privacy__nav { margin: 1.25rem 0 3rem; text-align: center; }
+      a { color: #53654e; text-underline-offset: .2em; }
+      h1, h2 { font-family: "Cormorant Garamond", serif; font-weight: 500; line-height: 1.15; }
+      h1 { margin: 0; font-size: clamp(2.8rem, 10vw, 4rem); text-align: center; }
+      h2 { margin: 2rem 0 .5rem; font-size: 1.8rem; }
+      .privacy__updated { margin: .75rem 0 2.5rem; color: var(--muted); font-size: .9rem; text-align: center; }
+      .privacy__notice { padding: 1rem; border: 1px solid #a8663a; background: #fff7ed; color: #5f341e; }
+      .privacy__footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--line); text-align: center; }
+      @media (min-width: 42rem) { .privacy { padding-top: 3rem; } }
+    </style>
+  </head>
+  <body>
+    <main class="privacy">
+      <a class="privacy__brand" href="./">Thushara &amp; Dakshin</a>
+      <nav class="privacy__nav" aria-label="Page navigation"><a href="./">Return to the wedding website</a></nav>
+      <h1>Privacy policy</h1>
+      <p class="privacy__updated">Effective date: 11 October 2026</p>
+
+      <p>This policy explains how the Thushara &amp; Dakshin wedding invitation website handles information when you visit the site or respond to an invitation. The couple who owns this invitation also owns and controls the Google spreadsheet used for RSVP records.</p>
+
+      <h2>Information handled by the RSVP service</h2>
+      <p>The couple may enter invitation details, such as invited guest names and email addresses, in the RSVP spreadsheet to create personalized invitation links. If you choose to submit an RSVP, the service processes the invitation token, your attendance choice, and the names of the people attending. Optional fields, such as dietary requirements, song requests, or a message, are collected only when enabled on the form. You can choose whether to submit an RSVP and which optional details to provide.</p>
+      <p>The service uses this information to identify your invitation, display its invited guest list, record or update your response, and help the couple plan the event. The website and its RSVP service transmit and process the response for these purposes; the couple controls the RSVP spreadsheet and its records.</p>
+
+      <h2>Where information is stored and processed</h2>
+      <p>The website is hosted as a static site by GitHub Pages. RSVP information is sent to a Google Apps Script service and stored in the Google spreadsheet selected and owned by the couple. The couple authorizes the service to access that selected spreadsheet using Google OAuth and the <code>drive.file</code> permission. The invitation token is used to look up and update the response for that invitation; it is not shown to other guests through the website.</p>
+      <p>Google and GitHub may process technical information, such as browser and connection data, when their services load or respond to requests. The site also loads fonts from Google Fonts. If you follow links to services such as Google Maps or WhatsApp, those services handle your visit under their own privacy policies.</p>
+
+      <h2>How information is shared</h2>
+      <p>RSVP information in the spreadsheet is available to the couple and people they authorize to manage it. The website operator does not sell RSVP information. Google processes information to provide the spreadsheet, OAuth, and Apps Script services; GitHub provides website hosting. Information may also be disclosed if required by law.</p>
+
+      <h2>Retention</h2>
+      <p>The couple, as owner of the RSVP spreadsheet, decides how long RSVP records are kept and is responsible for deleting them when they are no longer needed. Retention may depend on the couple’s event planning and record-keeping needs. The couple can manage or delete records in the spreadsheet.</p>
+
+      <h2>Your choices and questions</h2>
+      <p>The contacts listed in the website’s <a href="./#reach-out">Reach out to us</a> section are the couple and owners of the RSVP spreadsheet. Invitees can contact them with privacy questions, or to ask about RSVP information collected or held in that spreadsheet.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>If the website’s data practices change, this policy will be updated here. The effective date above will be revised when the policy changes.</p>
+
+      <footer class="privacy__footer"><a href="./">Back to the wedding website</a></footer>
+    </main>
+  </body>
+</html>

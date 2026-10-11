@@ -7,6 +7,7 @@ const footerLinks = [
   { href: '#details', label: 'The day' },
   ...(isFeatureEnabled('gallery') ? [{ href: '#gallery', label: 'Gallery' }] : []),
   { href: '#rsvp', label: 'RSVP' },
+  { href: `${import.meta.env.BASE_URL}privacy.html`, label: 'Privacy policy' },
 ]
 
 export function Footer() {

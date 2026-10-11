@@ -28,7 +28,7 @@ export function ReachOut() {
   if (contacts.length === 0) return null
 
   return (
-    <section className="reach-out" aria-labelledby="reach-out-title">
+    <section className="reach-out" id="reach-out" aria-labelledby="reach-out-title">
       <div className="section-shell reach-out__inner">
         <h2 id="reach-out-title">Reach out to us</h2>
         <p className="reach-out__intro">For any questions or further wedding details, please feel free to reach out to us.</p>
