@@ -7,6 +7,17 @@ type Attendance = '' | 'yes' | 'no'
 type FormValues = { attendance: Attendance; guests: string[]; dietaryRequirements: string; songRequest: string; message: string }
 const emptyValues: FormValues = { attendance: '', guests: [], dietaryRequirements: '', songRequest: '', message: '' }
 
+function ordinal(value: number) {
+  const remainder = value % 100
+  if (remainder >= 11 && remainder <= 13) return `${value}th`
+  switch (value % 10) {
+    case 1: return `${value}st`
+    case 2: return `${value}nd`
+    case 3: return `${value}rd`
+    default: return `${value}th`
+  }
+}
+
 export function RsvpForm({ token, invitation, existing, service }: { token: string; invitation: PublicInvitation; existing: RsvpRecord | null; service: RsvpService }) {
   const initialValues = useMemo<FormValues>(() => existing ? {
     attendance: existing.attending ? 'yes' : 'no', guests: existing.guests
@@ -38,7 +49,7 @@ export function RsvpForm({ token, invitation, existing, service }: { token: stri
   function renderAdditionalGuestFields() {
     return Array.from({ length: extraSlots }, (_, slot) => {
       const name = extraGuestNames[slot] ?? ''
-      return <label className="field" key={slot}>Invitee {namedGuests.length + slot + 1}
+      return <label className="field" key={slot}>{ordinal(namedGuests.length + slot + 1)} invitee
         <input type="text" maxLength={RSVP_LIMITS.guestName} value={name} onChange={(event) => {
           const extras = [...extraGuestNames]
           extras[slot] = event.target.value

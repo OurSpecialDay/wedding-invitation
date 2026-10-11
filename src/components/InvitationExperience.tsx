@@ -93,7 +93,7 @@ export function InvitationExperience({ children, guestName = 'Guest' }: { childr
             >
               <span className="envelope-cover__front">
                 <span className="envelope-cover__stamp" aria-hidden="true">
-                  <span className="envelope-cover__stamp-mark">✿</span>
+                  <img className="envelope-cover__stamp-logo" src={`${import.meta.env.BASE_URL}images/wedding-logo.png`} alt="" />
                 </span>
                 <span className="envelope-cover__center">
                   <span className="envelope-cover__guest">Dear {guestName}</span>
