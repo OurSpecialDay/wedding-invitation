@@ -84,7 +84,7 @@ export function RsvpForm({ token, invitation, existing, service }: { token: stri
 
   return <form className="rsvp-form" onSubmit={handleSubmit} noValidate>
     <p className="rsvp-form__welcome">Dear {invitation.primaryGuestName}</p>
-    {existing && <p className="rsvp-form__note">We have your reply. You can update it below.</p>}
+    {existing ? <p className="rsvp-form__note">We have your reply. You can update it below.</p> : <p className="rsvp-form__note">Please RSVP by 1st of December</p>}
     <fieldset><legend>Will you be joining us?</legend>
       <label className="choice"><input type="radio" name="attendance" value="yes" checked={values.attendance === 'yes'} onChange={() => setValues((v) => ({ ...v, attendance: 'yes' }))} /> Joyfully accepts</label>
       <label className="choice"><input type="radio" name="attendance" value="no" checked={values.attendance === 'no'} onChange={() => setValues((v) => ({ ...v, attendance: 'no', guests: [] }))} /> Regretfully declines</label>
