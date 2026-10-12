@@ -34,7 +34,7 @@ export default function App() {
   const groomSide = wedding.invitation?.parents?.groomSide
   const parentInvitationText = typeof brideSide === 'string' && brideSide.trim() &&
     typeof groomSide === 'string' && groomSide.trim()
-    ? `${brideSide} together with ${groomSide}, have the pleasure of inviting you to the wedding of their children,`
+    ? <>{brideSide} together with<br />{groomSide}, have the pleasure of inviting you to the wedding of their children,</>
     : null
 
   useLayoutEffect(() => {
