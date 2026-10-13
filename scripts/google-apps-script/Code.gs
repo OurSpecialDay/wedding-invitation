@@ -83,6 +83,7 @@ function rsvpBridgeSubmitRsvp(token, rsvp) {
     else appendSheetRow_('Responses!A:J', row);
     return { status: 'saved', rsvp: record };
   } catch (error) {
+    console.error('RSVP submission failed:', error);
     throw new Error('Unable to save RSVP.');
   } finally {
     if (lock.hasLock()) lock.releaseLock();

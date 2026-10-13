@@ -20,7 +20,7 @@ var RsvpValidation = (function () {
         var key = name.toLocaleLowerCase();
         if (seen[key]) errors.push('duplicate');
         seen[key] = true;
-        if (participants.every(function (entry) { return entry.toLocaleLowerCase() !== key; })) additional += 1;
+        if (participants.every(function (entry) { return entry.trim().toLocaleLowerCase() !== key; })) additional += 1;
       });
       if (additional > invitation.maxGuests - participants.length) errors.push('extraGuests');
     } else if (rsvp.guests.length) errors.push('declineGuests');

@@ -27,4 +27,17 @@ describe('Apps Script validation source', () => {
     expect(validation.validate(invitation, { ...submission, message: 'x'.repeat(1001) })).toContain('message')
     expect(validation.validate(invitation, { ...submission, guests: [{ name: 'Primary' }, { name: 'New' }] })).toContain('extraGuests')
   })
+
+  it('accepts a single selected invitee from a four-person list, including sheet whitespace', () => {
+    const fourInvitees = {
+      primaryGuestName: 'Primary',
+      invitedGuestNames: ['First Guest', 'Second Guest', ' Third Guest ', 'Fourth Guest'],
+      maxGuests: 4,
+      active: true,
+    }
+    expect(validation.validate(fourInvitees, {
+      ...submission,
+      guests: [{ name: 'Third Guest' }],
+    })).toEqual([])
+  })
 })
