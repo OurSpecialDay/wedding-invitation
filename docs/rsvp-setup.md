@@ -77,6 +77,31 @@ The bridge supports `getInvitation({token})`, `getRsvp({token})`, and `submitRsv
 
 Guest-facing messages are generic and do not display technical errors. The Apps Script does not log guest data.
 
+## Scheduled RSVP availability check
+
+The `Daily RSVP invitation check` GitHub Actions workflow opens the test deployment once per day at 08:00 UTC and can also be run manually. It checks that the test invitation's guest name and RSVP form load; it does not submit an RSVP. Configure the repository Actions variable `E2E_TEST_SITE_URL` with the test site's base URL (including its project path, for example `https://<OWNER>.github.io/wedding-invitation/`) and the Actions secret `E2E_RSVP_TEST_TOKEN` with a 32-character test invitation token. Use a token from the separate test Sheet and test bridge, never a production guest invitation. The deployed test site must be built with its test bridge URL in `VITE_RSVP_BRIDGE_URL`.
+
+For local runs, create `.env.e2e.local` in the repository root with these entries, replacing the placeholders with the test deployment values:
+
+```dotenv
+E2E_TEST_SITE_URL=https://<OWNER>.github.io/wedding-invitation/
+E2E_RSVP_TEST_TOKEN=<32-character-test-token>
+```
+
+Playwright loads this file automatically when it exists. The existing `*.local` rule in `.gitignore` keeps it out of Git. Shell environment variables already set for the same keys take precedence. Run `npx playwright install chromium` once to install the local browser, then use `npm run test:e2e` to run the check. Keep a test invitation token in this file; do not use a production guest token.
+
+### Send failure-only notifications to an admin email
+
+GitHub sends scheduled workflow notifications to the GitHub account that created the scheduled workflow. If another account updates the `schedule` cron entry, future notifications go to that account instead. To direct these notifications to a specific admin, have that admin's GitHub account create or update the cron schedule in `.github/workflows/rsvp-e2e.yml`. The admin account must also watch this repository.
+
+1. Sign in to the GitHub account for the admin who should receive alerts and open [Notification settings](https://github.com/settings/notifications).
+2. Under **System → Actions**, choose **Only notify for failed workflows**, then choose **Email** as the delivery method and save. GitHub's [Actions notification guide](https://docs.github.com/en/subscriptions-and-notifications/how-tos/managing-github-actions-notifications) describes this setting.
+3. In **Repository → Watch**, ensure that account is watching the repository.
+4. In **Settings → Emails**, confirm the intended admin email is added and verified, and is the address used for GitHub notifications.
+5. Ensure the admin account creates or updates the `schedule` entry in `.github/workflows/rsvp-e2e.yml` and saves the change. GitHub routes scheduled workflow notifications to the user who created or last updated that cron entry; see [workflow notification behavior](https://docs.github.com/en/actions/concepts/workflows-and-actions/notifications-for-workflow-runs).
+
+This uses GitHub's built-in email notifications and does not require a notification step or email credential in the workflow. GitHub's workflow notification setting is account-level; the workflow file cannot select an arbitrary recipient email address.
+
 ## Manual verification after setup
 
 Use a separate test spreadsheet and test deployment, never the live guest sheet. Share the test Sheet only with Account B, and confirm the Apps Script deployer Account A has no normal Drive access. Connect from the admin page and verify the selected spreadsheet name, tab/header checks, and rejected selection of an unauthorized file. Then verify acceptance, partial household attendance, an unnamed guest, decline, response update, revoked and unknown links, access-token refresh, disconnect/reconnect, and a deliberately failed API request. Check on a phone-sized viewport and confirm guest errors stay generic. This repository cannot perform the live two-account OAuth flow without a user-owned Cloud OAuth client and test deployment.
