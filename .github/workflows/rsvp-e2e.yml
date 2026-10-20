@@ -2,8 +2,11 @@ name: Daily RSVP invitation check
 
 on:
   schedule:
-    - cron: '35 2 * * *'
+    - cron: '45 2 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
