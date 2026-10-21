@@ -12,27 +12,25 @@
       if (event.source !== parentWindow || event.origin !== allowedParent) return;
       var message = event.data;
       if (!message || message.channel !== channel || message.type !== 'request' || message.nonce !== bridgeNonce || typeof message.id !== 'string') return;
+      function sendFailure(error) {
+        var messageText = String(error && error.message || '');
+        var errorCode = /userinfo\.email|authorization required|required permissions/i.test(messageText) ? 'authorization_required'
+          : messageText.indexOf('ADMIN_IDENTITY_UNAVAILABLE') >= 0 ? 'identity_unavailable'
+            : messageText.indexOf('ADMIN_ACCOUNT_NOT_ALLOWED') >= 0 ? 'not_allowed' : 'backend';
+        parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: errorCode }, allowedParent);
+      }
       if (message.method === 'getAuthorizationUrl') {
         google.script.run.withSuccessHandler(function (url) {
           parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: url || '' }, allowedParent);
-        }).withFailureHandler(function () {
-          parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: 'authorization_unavailable' }, allowedParent);
-        }).rsvpAdminGetAuthorizationUrl();
+        }).withFailureHandler(sendFailure).rsvpAdminGetAuthorizationUrl();
+      } else if (message.method === 'getViewerIdentity') {
+        google.script.run.withSuccessHandler(function (result) {
+          parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: result }, allowedParent);
+        }).withFailureHandler(sendFailure).rsvpAdminGetViewerIdentity();
       } else if (message.method === 'getAdminData') {
         google.script.run.withSuccessHandler(function (result) {
           parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: result }, allowedParent);
-        }).withFailureHandler(function (error) {
-          var messageText = String(error && error.message || '');
-          if (/userinfo\.email|authorization required|required permissions/i.test(messageText)) {
-            parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: 'authorization_required' }, allowedParent);
-          } else if (messageText.indexOf('ADMIN_IDENTITY_UNAVAILABLE') >= 0) {
-            parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: 'identity_unavailable' }, allowedParent);
-          } else if (messageText.indexOf('ADMIN_ACCOUNT_NOT_ALLOWED') >= 0) {
-            parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: 'not_allowed' }, allowedParent);
-          } else {
-            parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: 'backend' }, allowedParent);
-          }
-        }).rsvpAdminGetConsoleData();
+        }).withFailureHandler(sendFailure).rsvpAdminGetConsoleData();
       }
     });
   }());

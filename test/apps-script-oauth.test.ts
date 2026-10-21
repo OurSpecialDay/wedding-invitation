@@ -12,6 +12,7 @@ function createAppsScript() {
     ['GOOGLE_CLIENT_ID', 'client-id'],
     ['GOOGLE_CLIENT_SECRET', 'client-secret'],
     ['ADMIN_SETUP_PASSPHRASE', 'test-passphrase'],
+    ['ADMIN_ALLOWED_EMAILS', 'admin@example.test'],
     ['ALLOWED_PARENT_ORIGIN', 'https://example.test'],
     ['SPREADSHEET_ID', 'spreadsheet_12345678901234567890'],
     ['SPREADSHEET_NAME', 'Test wedding'],
@@ -25,6 +26,8 @@ function createAppsScript() {
   ]
   let responses: unknown[][] = [responseHeaders]
   const calls: Array<{ url: string; options: Record<string, unknown> }> = []
+  const logs: string[] = []
+  const authorizationInfoCalls: unknown[][] = []
   const bridgeTemplates: Array<Record<string, unknown>> = []
   const signInTemplates: Array<Record<string, unknown>> = []
   const scriptCache = new Map<string, string>()
@@ -35,6 +38,11 @@ function createAppsScript() {
   let headers = [invitationHeaders, responseHeaders]
 
   const context: Record<string, unknown> = {
+    console: {
+      info: (message: string) => logs.push(message),
+      warn: (message: string) => logs.push(message),
+      error: (message: string) => logs.push(message),
+    },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (key: string) => properties.get(key) || null,
@@ -47,7 +55,7 @@ function createAppsScript() {
       getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/test-deployment/exec' }),
       AuthMode: { FULL: 'FULL' },
       AuthorizationStatus: { NOT_REQUIRED: 'NOT_REQUIRED', REQUIRED: 'REQUIRED' },
-      getAuthorizationInfo: () => ({ getAuthorizationUrl: () => 'https://script.google.com/authorize', getAuthorizationStatus: () => 'REQUIRED' }),
+      getAuthorizationInfo: (...args: unknown[]) => { authorizationInfoCalls.push(args); return { getAuthorizationUrl: () => 'https://script.google.com/authorize', getAuthorizationStatus: () => 'REQUIRED' } },
       getScriptId: () => 'test-script-id',
       newStateToken: () => {
         const builder = {
@@ -60,6 +68,7 @@ function createAppsScript() {
       },
     },
     Utilities: { getUuid: () => 'generated-rsvp-id' },
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.test' }) },
     LockService: {
       getScriptLock: () => ({ waitLock: () => {}, hasLock: () => true, releaseLock: () => {} }),
     },
@@ -137,6 +146,8 @@ function createAppsScript() {
     context: context as Record<string, (...args: never[]) => unknown>,
     properties,
     calls,
+    logs,
+    authorizationInfoCalls,
     bridgeTemplates,
     signInTemplates,
     setRefreshResult: (value: Record<string, unknown>) => { refreshResult = value },
@@ -155,7 +166,36 @@ describe('Apps Script OAuth and Sheets API bridge', () => {
     script.context.doGet({ parameter: { admin: 'signin' } })
     expect(script.signInTemplates[0].authorizationUrl).toBe('https://script.google.com/authorize')
     expect(script.signInTemplates[0].authorizationStatus).toBe('REQUIRED')
+    expect(script.authorizationInfoCalls[0]).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
     expect(String(script.signInTemplates[0].content)).toContain('Authorize Google access')
+    expect(script.logs).toContain('RSVP_DIAG: Admin sign-in authorization status=REQUIRED, authorization link available')
+  })
+
+  it('returns the current admin email and allowlist result without reading Sheet data', () => {
+    const script = createAppsScript()
+    expect(script.context.rsvpAdminGetViewerIdentity()).toEqual({ email: 'admin@example.test', allowed: true })
+    expect(script.calls).toHaveLength(0)
+  })
+
+  it('reports a signed-in Google account that is not approved', () => {
+    const script = createAppsScript()
+    script.properties.set('ADMIN_ALLOWED_EMAILS', 'couple@example.test')
+    expect(script.context.rsvpAdminGetViewerIdentity()).toEqual({ email: 'admin@example.test', allowed: false })
+  })
+
+  it('logs admin bridge acceptance and rejects only with a sanitized reason', () => {
+    const accepted = createAppsScript()
+    accepted.context.doGet({ parameter: {
+      admin: 'console', parentOrigin: 'https://example.test', bridgeNonce: '12345678-1234-4234-8234-123456789abc',
+    } })
+    expect(accepted.logs).toContain('RSVP_DIAG: Admin console bridge accepted')
+
+    const rejected = createAppsScript()
+    rejected.context.doGet({ parameter: {
+      admin: 'console', parentOrigin: 'https://wrong.example', bridgeNonce: '12345678-1234-4234-8234-123456789abc',
+    } })
+    expect(rejected.logs).toContain('RSVP_DIAG: Admin console bridge rejected: origin mismatch')
+    expect(rejected.logs.join(' ')).not.toContain('https://wrong.example')
   })
 
   it('serves the bridge with its configured parent origin and per-load nonce', () => {

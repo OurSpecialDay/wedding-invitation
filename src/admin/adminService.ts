@@ -3,6 +3,7 @@ import { isTrustedAppsScriptOrigin } from '../services/rsvpService'
 
 type AdminErrorCode = 'not_configured' | 'connection' | 'authorization_required' | 'identity_unavailable' | 'authorization_unavailable' | 'not_allowed' | 'backend'
 type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown; errorCode?: AdminErrorCode }
+export type AdminViewerIdentity = { email: string; allowed: boolean }
 
 export class AdminServiceError extends Error {
   constructor(readonly code: AdminErrorCode) {
@@ -32,12 +33,17 @@ export class AdminService {
     return this.request<string>('getAuthorizationUrl')
   }
 
+  async getViewerIdentity(): Promise<AdminViewerIdentity> {
+    await this.connect()
+    return this.request<AdminViewerIdentity>('getViewerIdentity', isAdminViewerIdentity)
+  }
+
   private async loadData(): Promise<AdminData> {
     await this.connect()
     return this.request<AdminData>('getAdminData', isAdminData)
   }
 
-  private request<T>(method: 'getAdminData' | 'getAuthorizationUrl', validate?: (value: unknown) => value is T): Promise<T> {
+  private request<T>(method: 'getAdminData' | 'getAuthorizationUrl' | 'getViewerIdentity', validate?: (value: unknown) => value is T): Promise<T> {
     return new Promise((resolve, reject) => {
       const id = window.crypto.randomUUID()
       let timer: number
@@ -103,13 +109,20 @@ function isAdminData(value: unknown): value is AdminData {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<AdminData>
   return Array.isArray(candidate.invitations) && Array.isArray(candidate.responses)
-    && typeof candidate.duplicateResponseCount === 'number' && typeof candidate.orphanResponseCount === 'number'
+    && typeof candidate.viewerEmail === 'string' && typeof candidate.duplicateResponseCount === 'number' && typeof candidate.orphanResponseCount === 'number'
     && candidate.invitations.every((row) => row && typeof row.invitationKey === 'string' && typeof row.primaryGuestName === 'string' && typeof row.active === 'boolean' && (row.maxGuests === null || typeof row.maxGuests === 'number') && (row.invitedGuestNames === null || (Array.isArray(row.invitedGuestNames) && row.invitedGuestNames.every((name) => typeof name === 'string'))))
     && candidate.responses.every((row) => row && (row.invitationKey === null || typeof row.invitationKey === 'string') && Array.isArray(row.guests) && (row.attending === null || typeof row.attending === 'boolean') && row.guests.every((guest) => guest && typeof guest.name === 'string'))
 }
 
+function isAdminViewerIdentity(value: unknown): value is AdminViewerIdentity {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<AdminViewerIdentity>
+  return typeof candidate.email === 'string' && typeof candidate.allowed === 'boolean'
+}
+
 const service = new AdminService(import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? '')
 export const getAdminData = () => service.getData()
+export const getAdminViewerIdentity = () => service.getViewerIdentity()
 export const getAdminAuthorizationUrl = () => service.getAuthorizationUrl()
 export function getAdminSignInUrl(): string {
   const endpoint = import.meta.env.VITE_RSVP_ADMIN_URL?.trim()

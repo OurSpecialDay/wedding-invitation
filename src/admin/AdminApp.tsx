@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildAdminGroups, buildAdminGuests, csvText, dashboardMetrics, formatRate, type AdminData, type AdminGroup, type AdminGuest } from './model'
-import { AdminServiceError, getAdminAuthorizationUrl, getAdminData, getAdminSignInUrl } from './adminService'
+import { AdminServiceError, getAdminAuthorizationUrl, getAdminData, getAdminSignInUrl, getAdminViewerIdentity } from './adminService'
 
 type Section = 'dashboard' | 'guests' | 'reports'
 type Report = 'outstanding' | 'confirmed' | 'declined' | 'summary' | 'answers'
@@ -22,12 +22,17 @@ export default function AdminApp() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [authorizationUrl, setAuthorizationUrl] = useState('')
+  const [activeGoogleEmail, setActiveGoogleEmail] = useState('')
   const pageSize = 20
 
   async function refresh() {
     setLoading(true)
     setAuthorizationUrl('')
+    setActiveGoogleEmail('')
     try {
+      const identity = await getAdminViewerIdentity()
+      setActiveGoogleEmail(identity.email)
+      if (!identity.allowed) throw new AdminServiceError('not_allowed')
       const result = await getAdminData()
       setData(result)
       setFetchedAt(new Date())
@@ -116,7 +121,7 @@ export default function AdminApp() {
     <a className="admin-skip" href="#admin-content">Skip to admin content</a>
     <header className="admin-header">
       <a className="admin-brand" href={`${import.meta.env.BASE_URL}`} aria-label="Wedding website">Wedding <span>RSVP</span></a>
-      <div className="admin-header__right"><span className="admin-freshness">{fetchedAt ? `Updated ${fetchedAt.toLocaleTimeString()}` : 'Not yet updated'}</span><button type="button" className="admin-button admin-button--quiet" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</button></div>
+      <div className="admin-header__right"><span className="admin-account" aria-live="polite">Google account: {activeGoogleEmail || (loading ? 'checking…' : 'not verified')}</span><span className="admin-freshness">{fetchedAt ? `Updated ${fetchedAt.toLocaleTimeString()}` : 'Not yet updated'}</span><button type="button" className="admin-button admin-button--quiet" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</button></div>
     </header>
     <div className="admin-layout">
       <nav className="admin-nav" aria-label="Admin sections">{(['dashboard', 'guests', 'reports'] as const).map((item) => <button type="button" key={item} aria-current={section === item ? 'page' : undefined} onClick={() => go(item)}>{item === 'guests' ? 'Guest management' : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>

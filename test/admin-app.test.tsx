@@ -3,15 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminApp from '../src/admin/AdminApp'
 import type { AdminData } from '../src/admin/model'
 
-const { getAdminData, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError } = vi.hoisted(() => {
+const { getAdminData, getAdminViewerIdentity, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError } = vi.hoisted(() => {
   class MockAdminServiceError extends Error {
     constructor(readonly code: string) { super(code) }
   }
-  return { getAdminData: vi.fn(), getAdminAuthorizationUrl: vi.fn(), getAdminSignInUrl: vi.fn(), AdminServiceError: MockAdminServiceError }
+  return { getAdminData: vi.fn(), getAdminViewerIdentity: vi.fn(), getAdminAuthorizationUrl: vi.fn(), getAdminSignInUrl: vi.fn(), AdminServiceError: MockAdminServiceError }
 })
-vi.mock('../src/admin/adminService', () => ({ getAdminData, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError }))
+vi.mock('../src/admin/adminService', () => ({ getAdminData, getAdminViewerIdentity, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError }))
 
 const data: AdminData = {
+  viewerEmail: 'admin@example.test',
   invitations: [
     { invitationKey: 'key-one', primaryGuestName: 'The Ediriweera family', invitedGuestNames: ['Nimali Ediriweera', 'Ravi Ediriweera'], maxGuests: 2, active: true, createdAt: '', revokedAt: '' },
     { invitationKey: 'key-two', primaryGuestName: 'Taylor Swift', invitedGuestNames: [], maxGuests: 1, active: true, createdAt: '', revokedAt: '' },
@@ -29,6 +30,7 @@ describe('admin console', () => {
     if (!HTMLDialogElement.prototype.showModal) HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
     if (!HTMLDialogElement.prototype.close) HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new Event('close')) }
     getAdminData.mockReset().mockResolvedValue(data)
+    getAdminViewerIdentity.mockReset().mockResolvedValue({ email: data.viewerEmail, allowed: true })
     getAdminAuthorizationUrl.mockReset().mockResolvedValue('https://script.google.com/authorize')
     getAdminSignInUrl.mockReset().mockReturnValue('https://script.google.com/macros/s/deployment/exec?admin=signin')
   })
@@ -62,6 +64,14 @@ describe('admin console', () => {
     const { container } = render(<AdminApp />)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Apps Script connected but could not return RSVP data'))
     expect(container.querySelector('.admin-metrics')).toBeNull()
+  })
+
+  it('shows the active Google account and blocks data for an unapproved account', async () => {
+    getAdminViewerIdentity.mockResolvedValue({ email: 'other@example.test', allowed: false })
+    render(<AdminApp />)
+    expect(await screen.findByText('Google account: other@example.test')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('This Google account is not on the admin allowlist')
+    expect(getAdminData).not.toHaveBeenCalled()
   })
 
   it('offers a Google authorization link when the active user has not granted the required scopes', async () => {
