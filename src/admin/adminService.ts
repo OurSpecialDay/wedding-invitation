@@ -1,7 +1,15 @@
 import type { AdminData } from './model'
-import { isTrustedAppsScriptOrigin, RsvpServiceError } from '../services/rsvpService'
+import { isTrustedAppsScriptOrigin } from '../services/rsvpService'
 
-type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown }
+type AdminErrorCode = 'not_configured' | 'connection' | 'authorization_required' | 'identity_unavailable' | 'authorization_unavailable' | 'not_allowed' | 'backend'
+type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown; errorCode?: AdminErrorCode }
+
+export class AdminServiceError extends Error {
+  constructor(readonly code: AdminErrorCode) {
+    super(code)
+    this.name = 'AdminServiceError'
+  }
+}
 
 export class AdminService {
   private remoteWindow: Window | null = null
@@ -13,14 +21,23 @@ export class AdminService {
   constructor(private readonly endpoint: string) {}
 
   getData(): Promise<AdminData> {
-    if (!this.endpoint) return Promise.reject(new RsvpServiceError())
+    if (!this.endpoint) return Promise.reject(new AdminServiceError('not_configured'))
     if (this.dataRequest) return this.dataRequest
     this.dataRequest = this.loadData().finally(() => { this.dataRequest = null })
     return this.dataRequest
   }
 
+  async getAuthorizationUrl(): Promise<string> {
+    await this.connect()
+    return this.request<string>('getAuthorizationUrl')
+  }
+
   private async loadData(): Promise<AdminData> {
     await this.connect()
+    return this.request<AdminData>('getAdminData', isAdminData)
+  }
+
+  private request<T>(method: 'getAdminData' | 'getAuthorizationUrl', validate?: (value: unknown) => value is T): Promise<T> {
     return new Promise((resolve, reject) => {
       const id = window.crypto.randomUUID()
       let timer: number
@@ -30,20 +47,21 @@ export class AdminService {
         if (!message || message.channel !== 'wedding-rsvp-admin-bridge' || message.type !== 'response' || message.nonce !== this.nonce || message.id !== id) return
         window.clearTimeout(timer)
         window.removeEventListener('message', response)
-        if (!message.ok || !isAdminData(message.result)) reject(new RsvpServiceError())
-        else resolve(message.result)
+        if (!message.ok) reject(new AdminServiceError(message.errorCode ?? 'backend'))
+        else if (validate && !validate(message.result)) reject(new AdminServiceError('backend'))
+        else resolve(message.result as T)
       }
       timer = window.setTimeout(() => {
         window.removeEventListener('message', response)
-        reject(new RsvpServiceError())
+        reject(new AdminServiceError('connection'))
       }, 20_000)
       window.addEventListener('message', response)
       try {
-        this.remoteWindow?.postMessage({ channel: 'wedding-rsvp-admin-bridge', type: 'request', nonce: this.nonce, id, method: 'getAdminData' }, this.origin!)
+        this.remoteWindow?.postMessage({ channel: 'wedding-rsvp-admin-bridge', type: 'request', nonce: this.nonce, id, method }, this.origin!)
       } catch {
         window.clearTimeout(timer)
         window.removeEventListener('message', response)
-        reject(new RsvpServiceError())
+        reject(new AdminServiceError('connection'))
       }
     })
   }
@@ -71,7 +89,7 @@ export class AdminService {
         this.ready = null
         window.removeEventListener('message', handleReady)
         iframe.remove()
-        reject(new RsvpServiceError())
+        reject(new AdminServiceError('connection'))
       }, 20_000)
       window.addEventListener('message', handleReady)
       document.body.appendChild(iframe)
@@ -92,3 +110,4 @@ function isAdminData(value: unknown): value is AdminData {
 
 const service = new AdminService(import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? '')
 export const getAdminData = () => service.getData()
+export const getAdminAuthorizationUrl = () => service.getAuthorizationUrl()

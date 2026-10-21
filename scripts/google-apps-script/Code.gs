@@ -131,11 +131,16 @@ function rsvpAdminGetConsoleData() {
   return { invitations: invitations, responses: responses, duplicateResponseCount: duplicateResponseCount, orphanResponseCount: orphanResponseCount };
 }
 
+function rsvpAdminGetAuthorizationUrl() {
+  return ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL).getAuthorizationUrl() || '';
+}
+
 function requireAdminViewer_() {
   var email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  if (!email) throw new Error('ADMIN_IDENTITY_UNAVAILABLE');
   var allowed = String(PropertiesService.getScriptProperties().getProperty('ADMIN_ALLOWED_EMAILS') || '')
     .split(',').map(function (value) { return value.trim().toLowerCase(); }).filter(Boolean);
-  if (!email || !allowed.length || allowed.indexOf(email) < 0) throw new Error('Admin authorization failed.');
+  if (!allowed.length || allowed.indexOf(email) < 0) throw new Error('ADMIN_ACCOUNT_NOT_ALLOWED');
 }
 
 function adminInvitationKey_(token) {
