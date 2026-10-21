@@ -44,7 +44,15 @@
         setMessage('Working…');
         var runner = google.script.run
           .withSuccessHandler(function (result) { busy = false; callback(null, result); })
-          .withFailureHandler(function () { busy = false; setMessage('Request failed. Check the passphrase and try again.'); });
+          .withFailureHandler(function (error) {
+            busy = false;
+            var messageText = String(error && error.message || '');
+            if (/authorization is required|permission to call/i.test(messageText)) {
+              setMessage('Apps Script permissions are missing. Reload this setup page, approve the requested Google access, then choose Connect Google Sheet again.');
+            } else {
+              setMessage('Request failed. Check the passphrase and try again.');
+            }
+          });
         runner[name].apply(runner, args);
       }
       function refreshStatus() {
