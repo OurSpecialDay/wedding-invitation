@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildAdminGroups, buildAdminGuests, csvText, dashboardMetrics, type AdminData } from '../src/admin/model'
 
 const fixture: AdminData = {
+  viewerEmail: 'admin@example.test',
   invitations: [
     { invitationKey: 'key-household', primaryGuestName: 'The Lee family', invitedGuestNames: ['Ari Lee', 'Mina Lee'], maxGuests: 3, active: true, createdAt: '', revokedAt: '' },
     { invitationKey: 'key-single', primaryGuestName: 'Zoë O’Neil', invitedGuestNames: [], maxGuests: 1, active: true, createdAt: '', revokedAt: '' },

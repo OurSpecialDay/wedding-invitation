@@ -4,48 +4,60 @@ var OAUTH_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 var GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 var GOOGLE_SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
 var GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
+var USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 var OAUTH_PROPERTY_KEYS = ['GOOGLE_REFRESH_TOKEN', 'GOOGLE_ACCESS_TOKEN', 'GOOGLE_ACCESS_TOKEN_EXPIRES_AT', 'SPREADSHEET_ID', 'SPREADSHEET_NAME'];
 
 function doGet(e) {
   console.info('RSVP_DIAG: doGet reached');
   var properties = PropertiesService.getScriptProperties();
+  var adminRoute = e && e.parameter ? String(e.parameter.admin || '') : '';
+  console.info('RSVP_DIAG: doGet route=' + (adminRoute || 'guest-bridge'));
   if (e && e.parameter && e.parameter.admin === '1') {
     return HtmlService.createHtmlOutputFromFile('Admin').setTitle('RSVP Sheet setup');
   }
   if (e && e.parameter && e.parameter.admin === 'signin') {
     var authorizationUrl = '';
     var authorizationStatus = 'unavailable';
+    var activeEmail = '';
     try {
-      var authorizationInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+      var authorizationInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL, [USERINFO_EMAIL_SCOPE]);
       authorizationUrl = authorizationInfo.getAuthorizationUrl() || '';
       authorizationStatus = String(authorizationInfo.getAuthorizationStatus());
+      if (authorizationStatus === 'NOT_REQUIRED') activeEmail = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
     } catch (error) {
       console.error('RSVP_DIAG: Admin authorization status could not be checked');
     }
+    console.info('RSVP_DIAG: Admin sign-in authorization status=' + authorizationStatus + (authorizationUrl ? ', authorization link available' : ', no authorization link'));
     var signInPage = HtmlService.createTemplate(
       '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin sign-in</title></head>' +
       '<body style="font:16px Arial,sans-serif;max-width:38rem;margin:4rem auto;padding:0 1rem;line-height:1.5">' +
-      '<h1>Google account access is ready</h1><p>Use the approved admin Google account in this browser.</p>' +
+      '<h1>Google account access</h1><p>Use the approved admin Google account in this browser.</p>' +
+      '<? if (activeEmail) { ?><p>Google account detected: <strong><?= activeEmail ?></strong></p><? } else { ?><p>Google account not verified yet. The admin page will show the email Google provides after authorization.</p><? } ?>' +
       '<? if (authorizationUrl) { ?>' +
       '<p>Authorize the Apps Script permissions required by the admin console:</p><p><a href="<?= authorizationUrl ?>">Authorize Google access</a></p>' +
       '<p>After Google confirms authorization, return to the wedding admin page and choose Refresh data.</p>' +
       '<? } else if (authorizationStatus === "NOT_REQUIRED") { ?>' +
-      '<p>Apps Script permissions are already granted. Return to the wedding admin page and choose Refresh data.</p>' +
+      '<p>The email permission check reports that no additional grant is needed. Return to the wedding admin page and refresh. The console will show the account Google makes available to the admin deployment.</p>' +
       '<? } else { ?>' +
       '<p>Apps Script could not provide an authorization link. Return to the wedding admin page and refresh. If the connection still fails, ask the site owner to check the Apps Script deployment and execution details.</p>' +
       '<? } ?></body></html>'
     );
     signInPage.authorizationUrl = authorizationUrl;
     signInPage.authorizationStatus = authorizationStatus;
+    signInPage.activeEmail = activeEmail;
     return signInPage.evaluate().setTitle('Wedding RSVP admin sign-in');
   }
   if (e && e.parameter && e.parameter.admin === 'console') {
     var parentOrigin = properties.getProperty('ALLOWED_PARENT_ORIGIN');
     var requestedOrigin = e.parameter.parentOrigin;
     var nonce = e.parameter.bridgeNonce;
-    if (!parentOrigin || requestedOrigin !== parentOrigin || !nonce || !/^[A-Za-z0-9-]{20,80}$/.test(nonce)) {
+    var originMatches = Boolean(parentOrigin && requestedOrigin === parentOrigin);
+    var nonceIsValid = Boolean(nonce && /^[A-Za-z0-9-]{20,80}$/.test(nonce));
+    if (!originMatches || !nonceIsValid) {
+      console.warn('RSVP_DIAG: Admin console bridge rejected: ' + (!originMatches ? 'origin mismatch' : 'invalid nonce'));
       return HtmlService.createHtmlOutput('Invalid admin console request.');
     }
+    console.info('RSVP_DIAG: Admin console bridge accepted');
     var adminBridge = HtmlService.createTemplateFromFile('AdminBridge');
     adminBridge.allowedParentOrigin = parentOrigin;
     adminBridge.bridgeNonce = nonce;
@@ -135,7 +147,7 @@ function rsvpBridgeSubmitRsvp(token, rsvp) {
 // Private admin read. This method is only dispatched by AdminBridge.html and
 // independently checks the signed-in Apps Script execution identity.
 function rsvpAdminGetConsoleData() {
-  requireAdminViewer_();
+  var viewer = requireAdminViewer_();
   var ranges = readSheetRanges_(['Invitations!A:H', 'Responses!A:J']);
   var tokenKeys = Object.create(null);
   var invitations = ranges[0].slice(1).map(function (row) {
@@ -155,19 +167,35 @@ function rsvpAdminGetConsoleData() {
     if (!response.invitationKey) orphanResponseCount++;
     return response;
   });
-  return { invitations: invitations, responses: responses, duplicateResponseCount: duplicateResponseCount, orphanResponseCount: orphanResponseCount };
+  return { viewerEmail: viewer.email, invitations: invitations, responses: responses, duplicateResponseCount: duplicateResponseCount, orphanResponseCount: orphanResponseCount };
+}
+
+// Reports only the current user's own identity and allowlist status. It never reads Sheet data.
+function rsvpAdminGetViewerIdentity() {
+  var email = getAdminViewerEmail_();
+  return { email: email, allowed: isAdminEmailAllowed_(email) };
 }
 
 function rsvpAdminGetAuthorizationUrl() {
-  return ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL).getAuthorizationUrl() || '';
+  return ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL, [USERINFO_EMAIL_SCOPE]).getAuthorizationUrl() || '';
 }
 
 function requireAdminViewer_() {
+  var email = getAdminViewerEmail_();
+  if (!isAdminEmailAllowed_(email)) throw new Error('ADMIN_ACCOUNT_NOT_ALLOWED');
+  return { email: email };
+}
+
+function getAdminViewerEmail_() {
   var email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
   if (!email) throw new Error('ADMIN_IDENTITY_UNAVAILABLE');
+  return email;
+}
+
+function isAdminEmailAllowed_(email) {
   var allowed = String(PropertiesService.getScriptProperties().getProperty('ADMIN_ALLOWED_EMAILS') || '')
     .split(',').map(function (value) { return value.trim().toLowerCase(); }).filter(Boolean);
-  if (!allowed.length || allowed.indexOf(email) < 0) throw new Error('ADMIN_ACCOUNT_NOT_ALLOWED');
+  return allowed.length > 0 && allowed.indexOf(email) >= 0;
 }
 
 function adminInvitationKey_(token) {

@@ -19,7 +19,7 @@ export type AdminResponse = {
   message: string
 }
 
-export type AdminData = { invitations: AdminInvitation[]; responses: AdminResponse[]; duplicateResponseCount: number; orphanResponseCount: number }
+export type AdminData = { viewerEmail: string; invitations: AdminInvitation[]; responses: AdminResponse[]; duplicateResponseCount: number; orphanResponseCount: number }
 export type AdminGroup = { id: string; invitation: AdminInvitation; response: AdminResponse | null; responseStatus: 'pending' | 'confirmed' | 'declined' | 'unknown'; invitees: string[] }
 export type AdminGuest = { name: string; invitationName: string; groupId: string; responseStatus: AdminGroup['responseStatus']; attendanceStatus: 'attending' | 'declined' | 'unknown'; submittedAt: string; dietaryRequirements: string; songRequest: string; message: string }
 
