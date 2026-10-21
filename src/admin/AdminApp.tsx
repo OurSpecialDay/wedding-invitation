@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildAdminGroups, buildAdminGuests, csvText, dashboardMetrics, formatRate, type AdminData, type AdminGroup, type AdminGuest } from './model'
-import { getAdminData } from './adminService'
+import { AdminServiceError, getAdminAuthorizationUrl, getAdminData } from './adminService'
 
 type Section = 'dashboard' | 'guests' | 'reports'
 type Report = 'outstanding' | 'confirmed' | 'declined' | 'summary' | 'answers'
@@ -8,8 +8,6 @@ const reportNames: Record<Report, string> = { outstanding: 'Outstanding RSVPs', 
 const responseLabel = (status: AdminGroup['responseStatus']) => ({ pending: 'Awaiting reply', confirmed: 'Accepted', declined: 'Declined', unknown: 'Unclear response' })[status]
 const attendanceLabel = (status: AdminGuest['attendanceStatus']) => ({ attending: 'Attending', declined: 'Not attending', unknown: 'Unknown' })[status]
 const dateLabel = (value: string) => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.valueOf()) ? date.toLocaleString() : '—' }
-const adminDeploymentUrl = import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? ''
-
 export default function AdminApp() {
   const [data, setData] = useState<AdminData | null>(null)
   const [section, setSection] = useState<Section>('dashboard')
@@ -23,17 +21,42 @@ export default function AdminApp() {
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [authorizationUrl, setAuthorizationUrl] = useState('')
   const pageSize = 20
 
   async function refresh() {
     setLoading(true)
+    setAuthorizationUrl('')
     try {
       const result = await getAdminData()
       setData(result)
       setFetchedAt(new Date())
       setError('')
-    } catch {
-      setError('We could not retrieve admin data. Sign in with an approved Google account and try again.')
+    } catch (requestError) {
+      const code = requestError instanceof AdminServiceError ? requestError.code : 'backend'
+      if (code === 'authorization_required') {
+        try {
+          const url = await getAdminAuthorizationUrl()
+          if (url) {
+            setAuthorizationUrl(url)
+            setError('Google needs permission to identify your account for admin access. Choose your admin Google account and approve the requested Apps Script access. Afterward, return here and refresh.')
+          } else {
+            setError('Google authorization is required, but Apps Script did not return an authorization link. Ask the site owner to check the admin deployment and its OAuth scopes.')
+          }
+        } catch {
+          setError('Google authorization is required, but Apps Script could not start the authorization flow. Ask the site owner to check the admin deployment and its OAuth scopes.')
+        }
+      } else if (code === 'not_allowed') {
+        setError('This Google account is not on the admin allowlist. Switch to an approved account or ask the site owner to add it.')
+      } else if (code === 'identity_unavailable') {
+        setError('Google did not provide an email address for this session. Sign in with an approved account and confirm the admin deployment runs as the user accessing it.')
+      } else if (code === 'connection') {
+        setError('Could not connect to the admin Apps Script deployment. Check the admin URL and the allowed site origin.')
+      } else if (code === 'not_configured') {
+        setError('The admin Apps Script deployment URL is not configured in this site build.')
+      } else {
+        setError('Apps Script connected but could not return RSVP data. Check the Apps Script execution details and Sheet authorization.')
+      }
     } finally { setLoading(false) }
   }
   useEffect(() => { void refresh() }, [])
@@ -99,7 +122,7 @@ export default function AdminApp() {
       <nav className="admin-nav" aria-label="Admin sections">{(['dashboard', 'guests', 'reports'] as const).map((item) => <button type="button" key={item} aria-current={section === item ? 'page' : undefined} onClick={() => go(item)}>{item === 'guests' ? 'Guest management' : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>
       <section id="admin-content" className="admin-main" aria-live="polite">
         <div className="admin-page-title"><div><p className="admin-eyebrow">Wedding RSVP</p><h1>{section === 'guests' ? 'Guest management' : section[0].toUpperCase() + section.slice(1)}</h1></div></div>
-        {error && <p className="admin-alert" role="alert">{error} {adminDeploymentUrl && <a href={`${adminDeploymentUrl}${adminDeploymentUrl.includes('?') ? '&' : '?'}admin=1`} target="_blank" rel="noreferrer">Open the secure Apps Script page to sign in or authorize access</a>}</p>}
+        {error && <div className="admin-alert" role="alert"><p>{error}</p>{authorizationUrl && <p><a href={authorizationUrl} target="_blank" rel="noreferrer">Authorize Google access</a></p>}</div>}
         {loading && !data && <p className="admin-message" role="status">Connecting securely and loading RSVP records…</p>}
         {!loading && !data && !error && <p className="admin-message">Admin data is not configured.</p>}
         {data && section === 'dashboard' && <>
