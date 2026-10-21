@@ -1,0 +1,22 @@
+<!doctype html>
+<html><head><base target="_top"></head><body>
+<script>
+  (function () {
+    var channel = 'wedding-rsvp-admin-bridge';
+    var allowedParent = '<?= allowedParentOrigin ?>';
+    var bridgeNonce = '<?= bridgeNonce ?>';
+    if (!allowedParent || !bridgeNonce || window.top === window) return;
+    var parentWindow = window.top;
+    parentWindow.postMessage({ channel: channel, type: 'ready', nonce: bridgeNonce }, allowedParent);
+    window.addEventListener('message', function (event) {
+      if (event.source !== parentWindow || event.origin !== allowedParent) return;
+      var message = event.data;
+      if (!message || message.channel !== channel || message.type !== 'request' || message.nonce !== bridgeNonce || typeof message.id !== 'string' || message.method !== 'getAdminData') return;
+      google.script.run.withSuccessHandler(function (result) {
+        parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: result }, allowedParent);
+      }).withFailureHandler(function () {
+        parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false }, allowedParent);
+      }).rsvpAdminGetConsoleData();
+    });
+  }());
+</script></body></html>

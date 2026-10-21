@@ -6,7 +6,9 @@
       var parts = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/');
       var base = parts[0] ? '/' + parts[0] + '/' : '/';
       var route = parts.slice(1).join('/');
-      if (/^rsvp\/[A-Za-z0-9_-]{32}$/.test(route)) {
+      if (route === 'admin') {
+        window.location.replace(base + 'admin/');
+      } else if (/^rsvp\/[A-Za-z0-9_-]{32}$/.test(route)) {
         window.location.replace(base + '?__ghPagesRoute=' + encodeURIComponent(route));
       } else {
         window.location.replace(base);

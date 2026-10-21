@@ -44,7 +44,7 @@ The Apps Script accesses the Sheet using the wedding administrator's OAuth grant
 
 ## Apps Script installation and deployment
 
-Source is in `scripts/google-apps-script/`. Copy `Code.gs`, `Validation.gs`, `Bridge.html`, `Admin.html`, and `appsscript.json` into the existing standalone Apps Script project. Keep this as the existing project; do not create another deployment service.
+Source is in `scripts/google-apps-script/`. Copy `Code.gs`, `Validation.gs`, `Bridge.html`, `AdminBridge.html`, `Admin.html`, and `appsscript.json` into the existing standalone Apps Script project. Keep this as the existing project; do not create another deployment service.
 
 In **Project Settings → Script Properties**, configure:
 
@@ -74,6 +74,29 @@ The bridge supports `getInvitation({token})`, `getRsvp({token})`, and `submitRsv
 - RSVP lookup returns `active` with a response or `null`; revoked and unknown invitations remain distinct.
 - Submit returns `saved` with the stored response or an invitation state. Declines are stored as `attending: false` and an empty guest array. Acceptances require at least one named attendee.
 - Name, dietary, song, and message limits are 100, 500, 120, and 1,000 characters. An invitation allows at most 20 total guests.
+
+## Read-only admin console
+
+The static admin app is served from `<site-base>/admin/`. It reads the existing `Invitations!A:H` and `Responses!A:J` ranges in one batch and does not write to the Sheet. It never requests or returns invitation email addresses or invitation tokens. The public `Bridge.html` dispatcher remains limited to the existing guest operations.
+
+Admin records are private, so create a **second web app deployment in the same Apps Script project**. Do not create another Apps Script project or replace the guest deployment.
+
+In the Apps Script editor, choose **Deploy → New deployment**, select **Web app**, and use these settings for the new admin deployment:
+
+- **Execute as:** `User accessing the web app`
+- **Who has access:** `Anyone with a Google account`
+
+These settings let the server check the signed-in Google account while keeping guest RSVP access anonymous on the existing deployment. Leave the guest deployment configured as **Execute as: Me** and **Who has access: Anyone**. Admin users must sign in and authorize the Apps Script scopes when prompted. The `userinfo.email` OAuth scope is required because Apps Script does not expose the active user's email without it; the backend also rejects a blank email. See Google's [web app execution options](https://developers.google.com/apps-script/guides/web) and [Session.getActiveUser reference](https://developers.google.com/apps-script/reference/base/session).
+
+Apps Script deployments are separate versioned releases of the same saved project code. The admin and guest deployments each have their own URL, selected code version, and access settings. After changing the source, choose **Deploy → Manage deployments**, edit the deployment you want to update, select a new version, and deploy it. Update the guest and admin deployments separately when both need the change; updating one does not update the other. Updating an existing deployment keeps its URL and deployment settings. When updating the guest deployment, retain **Execute as: Me** and **Who has access: Anyone**.
+
+Set `ADMIN_ALLOWED_EMAILS` in Script Properties to a comma-separated list of the exact Google account email addresses allowed to view guest information. The server reads `Session.getActiveUser().getEmail()` for every admin request and fails closed if it is empty or is not in that list. Do not place this allowlist in frontend code. An admin account also needs access to the Apps Script web app; the Sheet remains accessed through the existing server-stored `drive.file` OAuth grant.
+
+The private data operation is `rsvpAdminGetConsoleData()`. `AdminBridge.html` dispatches only that fixed method; the public RSVP bridge cannot dispatch admin operations. The method joins records server-side and sends only SHA-256-derived opaque invitation keys, never bearer invitation tokens. It uses batched Sheets API GET calls only. The setup page's existing passphrase still only protects connection setup and is not used as admin-console authorization.
+
+After creating the admin deployment, copy its `/exec` URL to the GitHub repository Actions variable `VITE_RSVP_ADMIN_URL`. For local development, place it in the ignored `.env.local` as `VITE_RSVP_ADMIN_URL` and restart Vite. Keep the admin deployment URL out of Git and do not replace the guest deployment URL; both URLs are configuration values rather than credentials. This repository cannot verify Google sign-in, Apps Script deployment access settings, or the live Sheet; verify the admin deployment using the user-owned setup and test data before exposing it to guests.
+
+The dashboard treats `Active` invitations as eligible groups. Invitation counts are distinct from named individual invitees: a non-empty `Invited Guest Names` JSON list contains the RSVP participants, while an empty list uses `Primary Guest Name` as the one named invitee. An unreadable invitation guest list is not inferred from the primary greeting and is called out as a data-quality issue. `Max Guests` is capacity and does not create unnamed individuals in the invited-person count. Responded groups require an existing response row with a boolean `Attending` value and a non-empty guest list for acceptances. Guest attendance is counted from recorded RSVP guest names; for an accepting household, named invitees omitted from the accepted list are not attending. Attendance rate is attending people divided by recorded attending plus declining people. Missing denominators are displayed as unavailable. Historical RSVP revisions are not present: submissions update the row keyed by invitation token. If duplicate response rows exist, the first stored row is used to match the existing public lookup and a data-quality note is shown.
 
 Guest-facing messages are generic and do not display technical errors. The Apps Script does not log guest data.
 

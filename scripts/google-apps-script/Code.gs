@@ -7,9 +7,22 @@ var GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 var OAUTH_PROPERTY_KEYS = ['GOOGLE_REFRESH_TOKEN', 'GOOGLE_ACCESS_TOKEN', 'GOOGLE_ACCESS_TOKEN_EXPIRES_AT', 'SPREADSHEET_ID', 'SPREADSHEET_NAME'];
 
 function doGet(e) {
+  console.info('RSVP_DIAG: doGet reached');
   var properties = PropertiesService.getScriptProperties();
   if (e && e.parameter && e.parameter.admin === '1') {
     return HtmlService.createHtmlOutputFromFile('Admin').setTitle('RSVP Sheet setup');
+  }
+  if (e && e.parameter && e.parameter.admin === 'console') {
+    var parentOrigin = properties.getProperty('ALLOWED_PARENT_ORIGIN');
+    var requestedOrigin = e.parameter.parentOrigin;
+    var nonce = e.parameter.bridgeNonce;
+    if (!parentOrigin || requestedOrigin !== parentOrigin || !nonce || !/^[A-Za-z0-9-]{20,80}$/.test(nonce)) {
+      return HtmlService.createHtmlOutput('Invalid admin console request.');
+    }
+    var adminBridge = HtmlService.createTemplateFromFile('AdminBridge');
+    adminBridge.allowedParentOrigin = parentOrigin;
+    adminBridge.bridgeNonce = nonce;
+    return adminBridge.evaluate().setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
   var parentOrigin = properties.getProperty('ALLOWED_PARENT_ORIGIN');
   if (!parentOrigin) return HtmlService.createHtmlOutput('RSVP service is not configured.');
@@ -25,8 +38,10 @@ function doGet(e) {
 function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
 
 function rsvpBridgeGetInvitation(token) {
+  console.info('RSVP_DIAG: Guest lookup started');
   if (!RsvpValidation.isToken(token)) return { status: 'not-found' };
   var ranges = readSheetRanges_(['Invitations!A:H', 'Responses!A:J']);
+  console.info('RSVP_DIAG: Guest lookup Sheets read succeeded');
   var invitation = null;
   for (var i = 1; i < ranges[0].length; i++) {
     if (String(ranges[0][i][0]) === token) { invitation = invitationFromRow_(ranges[0][i]); break; }
@@ -88,6 +103,68 @@ function rsvpBridgeSubmitRsvp(token, rsvp) {
   } finally {
     if (lock.hasLock()) lock.releaseLock();
   }
+}
+
+// Private admin read. This method is only dispatched by AdminBridge.html and
+// independently checks the signed-in Apps Script execution identity.
+function rsvpAdminGetConsoleData() {
+  requireAdminViewer_();
+  var ranges = readSheetRanges_(['Invitations!A:H', 'Responses!A:J']);
+  var tokenKeys = Object.create(null);
+  var invitations = ranges[0].slice(1).map(function (row) {
+    var token = String(row[0] || '');
+    var invitationKey = adminInvitationKey_(token);
+    if (invitationKey) tokenKeys[token] = invitationKey;
+    return adminInvitationFromRow_(row, invitationKey);
+  });
+  var seenTokens = Object.create(null);
+  var duplicateResponseCount = 0;
+  var orphanResponseCount = 0;
+  var responses = ranges[1].slice(1).map(function (row) {
+    var token = String(row[0] || '');
+    if (seenTokens[token]) duplicateResponseCount++;
+    seenTokens[token] = true;
+    var response = adminResponseFromRow_(row, tokenKeys[token] || null);
+    if (!response.invitationKey) orphanResponseCount++;
+    return response;
+  });
+  return { invitations: invitations, responses: responses, duplicateResponseCount: duplicateResponseCount, orphanResponseCount: orphanResponseCount };
+}
+
+function requireAdminViewer_() {
+  var email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  var allowed = String(PropertiesService.getScriptProperties().getProperty('ADMIN_ALLOWED_EMAILS') || '')
+    .split(',').map(function (value) { return value.trim().toLowerCase(); }).filter(Boolean);
+  if (!email || !allowed.length || allowed.indexOf(email) < 0) throw new Error('Admin authorization failed.');
+}
+
+function adminInvitationKey_(token) {
+  if (!RsvpValidation.isToken(token)) return '';
+  return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token, Utilities.Charset.UTF_8)).replace(/=+$/, '');
+}
+
+function adminInvitationFromRow_(row, invitationKey) {
+  var invitedGuestNames;
+  try { invitedGuestNames = JSON.parse(String(row[3] || '[]')); } catch (e) { invitedGuestNames = null; }
+  if (!Array.isArray(invitedGuestNames) || !invitedGuestNames.every(function (name) { return typeof name === 'string'; })) invitedGuestNames = null;
+  return {
+    invitationKey: invitationKey, primaryGuestName: String(row[1] || ''), invitedGuestNames: invitedGuestNames,
+    maxGuests: row[4] === '' || row[4] == null || isNaN(Number(row[4])) ? null : Number(row[4]), active: row[5] === true || String(row[5]).toLowerCase() === 'true',
+    createdAt: String(row[6] || ''), revokedAt: String(row[7] || '')
+  };
+}
+
+function adminResponseFromRow_(row, invitationKey) {
+  var guests;
+  try { guests = JSON.parse(String(row[6] || '[]')); } catch (e) { guests = null; }
+  if (!Array.isArray(guests)) guests = [];
+  var attending = row[4] === true || String(row[4]).toLowerCase() === 'true' ? true
+    : row[4] === false || String(row[4]).toLowerCase() === 'false' ? false : null;
+  return {
+    invitationKey: invitationKey, submittedAt: String(row[2] || ''), updatedAt: String(row[3] || ''),
+    attending: attending, guests: guests.filter(function (guest) { return guest && typeof guest === 'object' && typeof guest.name === 'string'; }).map(function (guest) { return { name: guest.name }; }),
+    dietaryRequirements: String(row[7] || ''), songRequest: String(row[8] || ''), message: String(row[9] || '')
+  };
 }
 
 function findInvitation_(token) {
@@ -183,6 +260,7 @@ function googleAccessToken_() {
   var expiresAt = Number(properties.getProperty('GOOGLE_ACCESS_TOKEN_EXPIRES_AT') || 0);
   var cached = properties.getProperty('GOOGLE_ACCESS_TOKEN');
   if (cached && Date.now() < expiresAt - 60000) return cached;
+  console.info('RSVP_DIAG: Sheets token refresh started');
   var response = UrlFetchApp.fetch(GOOGLE_TOKEN_URL, {
     method: 'post',
     payload: {
@@ -196,6 +274,16 @@ function googleAccessToken_() {
   var status = response.getResponseCode();
   var body = response.getContentText();
   var result = parseJson_(body);
+  if (status < 200 || status >= 300 || !result.access_token) {
+    console.error(JSON.stringify({
+      event: 'RSVP_SHEETS_OAUTH_REFRESH_FAILED',
+      httpStatus: status,
+      googleError: String(result.error || 'unknown')
+    }));
+  } else {
+    console.info('RSVP_DIAG: Sheets token refresh succeeded');
+  }
+
   if (status < 200 || status >= 300 || !result.access_token) {
     if (result.error === 'invalid_grant') {
       properties.deleteProperty('GOOGLE_REFRESH_TOKEN');
