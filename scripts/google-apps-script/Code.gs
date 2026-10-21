@@ -12,6 +12,14 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.admin === '1') {
     return HtmlService.createHtmlOutputFromFile('Admin').setTitle('RSVP Sheet setup');
   }
+  if (e && e.parameter && e.parameter.admin === 'signin') {
+    return HtmlService.createHtmlOutput(
+      '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin sign-in</title></head>' +
+      '<body style="font:16px Arial,sans-serif;max-width:38rem;margin:4rem auto;padding:0 1rem;line-height:1.5">' +
+      '<h1>Google account access is ready</h1><p>Return to the wedding admin page and choose Refresh data. Use the approved admin Google account in this browser.</p>' +
+      '<p>If Google showed an authorization prompt, complete it before returning.</p></body></html>'
+    ).setTitle('Wedding RSVP admin sign-in');
+  }
   if (e && e.parameter && e.parameter.admin === 'console') {
     var parentOrigin = properties.getProperty('ALLOWED_PARENT_ORIGIN');
     var requestedOrigin = e.parameter.parentOrigin;
