@@ -16,6 +16,8 @@ npm run preview
 
 The Vite base path defaults to `/wedding-invitation/`. The `coupleNamePath` feature flag in `src/config/featureFlags.ts` can switch it to a slug generated from the configured bride and groom display names. `public/404.html` restores direct RSVP links under the active base path. The deploy workflow runs the tests, builds `dist`, and deploys with GitHub Actions. Set **Repository Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
 
+The read-only admin console is deployed at `<site-base>/admin/`. It requires a separate Apps Script web app deployment configured to execute as the signed-in user, with an explicit `ADMIN_ALLOWED_EMAILS` Script Property allowlist. Keep the existing anonymous guest deployment unchanged. See [the RSVP setup guide](docs/rsvp-setup.md#read-only-admin-console) for the secure deployment steps. Configure the separate admin deployment URL as the GitHub Actions repository variable `VITE_RSVP_ADMIN_URL`; it is a public URL, not a credential.
+
 ## Invitation opening music
 
 The invitation opens behind an envelope intro on every page load. The background track is `public/music/wedding-music.mp3`; replace that file to use a different track. Its URL is resolved against Vite's configured base path for GitHub Pages. If the audio cannot load or play, the invitation remains usable and the music control stays hidden.
