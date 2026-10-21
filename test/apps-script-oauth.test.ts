@@ -28,6 +28,7 @@ function createAppsScript() {
   const calls: Array<{ url: string; options: Record<string, unknown> }> = []
   const logs: string[] = []
   const authorizationInfoCalls: unknown[][] = []
+  const requireScopeCalls: unknown[][] = []
   const bridgeTemplates: Array<Record<string, unknown>> = []
   const signInTemplates: Array<Record<string, unknown>> = []
   const scriptCache = new Map<string, string>()
@@ -55,6 +56,7 @@ function createAppsScript() {
       getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/test-deployment/exec' }),
       AuthMode: { FULL: 'FULL' },
       AuthorizationStatus: { NOT_REQUIRED: 'NOT_REQUIRED', REQUIRED: 'REQUIRED' },
+      requireScopes: (...args: unknown[]) => { requireScopeCalls.push(args) },
       getAuthorizationInfo: (...args: unknown[]) => { authorizationInfoCalls.push(args); return { getAuthorizationUrl: () => 'https://script.google.com/authorize', getAuthorizationStatus: () => 'REQUIRED' } },
       getScriptId: () => 'test-script-id',
       newStateToken: () => {
@@ -148,6 +150,7 @@ function createAppsScript() {
     calls,
     logs,
     authorizationInfoCalls,
+    requireScopeCalls,
     bridgeTemplates,
     signInTemplates,
     setRefreshResult: (value: Record<string, unknown>) => { refreshResult = value },
@@ -167,14 +170,28 @@ describe('Apps Script OAuth and Sheets API bridge', () => {
     expect(script.signInTemplates[0].authorizationUrl).toBe('https://script.google.com/authorize')
     expect(script.signInTemplates[0].authorizationStatus).toBe('REQUIRED')
     expect(script.authorizationInfoCalls[0]).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
+    expect(script.requireScopeCalls[0]).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
     expect(String(script.signInTemplates[0].content)).toContain('Authorize Google access')
     expect(script.logs).toContain('RSVP_DIAG: Admin sign-in authorization status=REQUIRED, authorization link available')
+  })
+
+  it('requires Apps Script setup scopes before showing the Sheet connection page', () => {
+    const script = createAppsScript()
+    const result = script.context.doGet({ parameter: { admin: '1' } }) as { file: string }
+    expect(result.file).toBe('Admin')
+    expect(script.requireScopeCalls[0]).toEqual(['FULL', [
+      'https://www.googleapis.com/auth/script.external_request',
+      'https://www.googleapis.com/auth/script.scriptapp',
+    ]])
   })
 
   it('returns the current admin email and allowlist result without reading Sheet data', () => {
     const script = createAppsScript()
     expect(script.context.rsvpAdminGetViewerIdentity()).toEqual({ email: 'admin@example.test', allowed: true })
+    expect(script.requireScopeCalls.at(-1)).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
     expect(script.calls).toHaveLength(0)
+    expect(script.logs).toContain('RSVP_DIAG: Admin viewer identity check started')
+    expect(script.logs).toContain('RSVP_DIAG: Admin viewer identity available; allowlisted=true')
   })
 
   it('reports a signed-in Google account that is not approved', () => {

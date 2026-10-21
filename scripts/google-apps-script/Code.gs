@@ -5,6 +5,10 @@ var GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 var GOOGLE_SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
 var GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 var USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
+var ADMIN_SETUP_SCOPES = [
+  'https://www.googleapis.com/auth/script.external_request',
+  'https://www.googleapis.com/auth/script.scriptapp'
+];
 var OAUTH_PROPERTY_KEYS = ['GOOGLE_REFRESH_TOKEN', 'GOOGLE_ACCESS_TOKEN', 'GOOGLE_ACCESS_TOKEN_EXPIRES_AT', 'SPREADSHEET_ID', 'SPREADSHEET_NAME'];
 
 function doGet(e) {
@@ -13,9 +17,13 @@ function doGet(e) {
   var adminRoute = e && e.parameter ? String(e.parameter.admin || '') : '';
   console.info('RSVP_DIAG: doGet route=' + (adminRoute || 'guest-bridge'));
   if (e && e.parameter && e.parameter.admin === '1') {
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ADMIN_SETUP_SCOPES);
     return HtmlService.createHtmlOutputFromFile('Admin').setTitle('RSVP Sheet setup');
   }
   if (e && e.parameter && e.parameter.admin === 'signin') {
+    // Enforce this scope in the top-level page context so Apps Script can show
+    // its native consent flow instead of trusting a separate bridge check.
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, [USERINFO_EMAIL_SCOPE]);
     var authorizationUrl = '';
     var authorizationStatus = 'unavailable';
     var activeEmail = '';
@@ -32,7 +40,7 @@ function doGet(e) {
       '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin sign-in</title></head>' +
       '<body style="font:16px Arial,sans-serif;max-width:38rem;margin:4rem auto;padding:0 1rem;line-height:1.5">' +
       '<h1>Google account access</h1><p>Use the approved admin Google account in this browser.</p>' +
-      '<? if (activeEmail) { ?><p>Google account detected: <strong><?= activeEmail ?></strong></p><? } else { ?><p>Google account not verified yet. The admin page will show the email Google provides after authorization.</p><? } ?>' +
+      '<? if (activeEmail) { ?><p>This page detected: <strong><?= activeEmail ?></strong>. The admin console verifies the account separately before showing RSVP data.</p><? } else { ?><p>Google account not verified on this page. The admin console will check the account separately.</p><? } ?>' +
       '<? if (authorizationUrl) { ?>' +
       '<p>Authorize the Apps Script permissions required by the admin console:</p><p><a href="<?= authorizationUrl ?>">Authorize Google access</a></p>' +
       '<p>After Google confirms authorization, return to the wedding admin page and choose Refresh data.</p>' +
@@ -172,8 +180,11 @@ function rsvpAdminGetConsoleData() {
 
 // Reports only the current user's own identity and allowlist status. It never reads Sheet data.
 function rsvpAdminGetViewerIdentity() {
+  console.info('RSVP_DIAG: Admin viewer identity check started');
   var email = getAdminViewerEmail_();
-  return { email: email, allowed: isAdminEmailAllowed_(email) };
+  var allowed = isAdminEmailAllowed_(email);
+  console.info('RSVP_DIAG: Admin viewer identity available; allowlisted=' + allowed);
+  return { email: email, allowed: allowed };
 }
 
 function rsvpAdminGetAuthorizationUrl() {
@@ -187,8 +198,12 @@ function requireAdminViewer_() {
 }
 
 function getAdminViewerEmail_() {
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, [USERINFO_EMAIL_SCOPE]);
   var email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
-  if (!email) throw new Error('ADMIN_IDENTITY_UNAVAILABLE');
+  if (!email) {
+    console.warn('RSVP_DIAG: Admin viewer identity unavailable');
+    throw new Error('ADMIN_IDENTITY_UNAVAILABLE');
+  }
   return email;
 }
 
