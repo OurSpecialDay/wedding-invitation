@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildAdminGroups, buildAdminGuests, csvText, dashboardMetrics, formatRate, type AdminData, type AdminGroup, type AdminGuest } from './model'
-import { AdminServiceError, getAdminAuthorizationUrl, getAdminData, getAdminSignInUrl, getAdminViewerIdentity } from './adminService'
+import { AdminServiceError, getAdminData } from './adminService'
 
 type Section = 'dashboard' | 'guests' | 'reports'
 type Report = 'outstanding' | 'confirmed' | 'declined' | 'summary' | 'answers'
@@ -21,42 +21,23 @@ export default function AdminApp() {
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [authorizationUrl, setAuthorizationUrl] = useState('')
-  const [activeGoogleEmail, setActiveGoogleEmail] = useState('')
+  const [adminCode, setAdminCode] = useState('')
   const pageSize = 20
 
   async function refresh() {
     setLoading(true)
-    setAuthorizationUrl('')
-    setActiveGoogleEmail('')
+    if (!adminCode) { setLoading(false); setError('Enter the admin code to view RSVP data.'); return }
     try {
-      const identity = await getAdminViewerIdentity()
-      setActiveGoogleEmail(identity.email)
-      if (!identity.allowed) throw new AdminServiceError('not_allowed')
-      const result = await getAdminData()
+      const result = await getAdminData(adminCode)
       setData(result)
       setFetchedAt(new Date())
       setError('')
     } catch (requestError) {
       const code = requestError instanceof AdminServiceError ? requestError.code : 'backend'
-      if (code === 'authorization_required') {
-        try {
-          const url = await getAdminAuthorizationUrl()
-          if (url) {
-            setAuthorizationUrl(url)
-            setError('Google needs permission to identify your account for admin access. Choose your admin Google account and approve the requested Apps Script access. Afterward, return here and refresh.')
-          } else {
-            setError('Google authorization is required, but Apps Script did not return an authorization link. Ask the site owner to check the admin deployment and its OAuth scopes.')
-          }
-        } catch {
-          setError('Google authorization is required, but Apps Script could not start the authorization flow. Ask the site owner to check the admin deployment and its OAuth scopes.')
-        }
-      } else if (code === 'not_allowed') {
-        setError('This Google account is not on the admin allowlist. Switch to an approved account or ask the site owner to add it.')
-      } else if (code === 'identity_unavailable') {
-        setError('Google did not provide an email address for this session. Sign in with an approved account and confirm the admin deployment runs as the user accessing it.')
+      if (code === 'invalid_code') {
+        setError('That admin code is incorrect. Try again.')
       } else if (code === 'connection') {
-        setError('The admin connection did not start. Open the Apps Script access page, sign in with the approved admin account, and authorize any requested Apps Script permissions. Then return here and refresh. If no authorization link appears or the connection still fails, ask the site owner to check the admin deployment and allowed site origin.')
+        setError('The admin connection could not start. Check the Apps Script deployment URL and allowed site origin.')
       } else if (code === 'not_configured') {
         setError('The admin Apps Script deployment URL is not configured in this site build.')
       } else {
@@ -121,14 +102,15 @@ export default function AdminApp() {
     <a className="admin-skip" href="#admin-content">Skip to admin content</a>
     <header className="admin-header">
       <a className="admin-brand" href={`${import.meta.env.BASE_URL}`} aria-label="Wedding website">Wedding <span>RSVP</span></a>
-      <div className="admin-header__right"><span className="admin-account" aria-live="polite">Google account: {activeGoogleEmail || (loading ? 'checking…' : 'not verified')}</span><span className="admin-freshness">{fetchedAt ? `Updated ${fetchedAt.toLocaleTimeString()}` : 'Not yet updated'}</span><button type="button" className="admin-button admin-button--quiet" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</button></div>
+      <div className="admin-header__right"><span className="admin-freshness">{fetchedAt ? `Updated ${fetchedAt.toLocaleTimeString()}` : 'Not yet updated'}</span><button type="button" className="admin-button admin-button--quiet" onClick={() => void refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</button></div>
     </header>
     <div className="admin-layout">
       <nav className="admin-nav" aria-label="Admin sections">{(['dashboard', 'guests', 'reports'] as const).map((item) => <button type="button" key={item} aria-current={section === item ? 'page' : undefined} onClick={() => go(item)}>{item === 'guests' ? 'Guest management' : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>
       <section id="admin-content" className="admin-main" aria-live="polite">
         <div className="admin-page-title"><div><p className="admin-eyebrow">Wedding RSVP</p><h1>{section === 'guests' ? 'Guest management' : section[0].toUpperCase() + section.slice(1)}</h1></div></div>
-        {error && <div className="admin-alert" role="alert"><p>{error}</p>{authorizationUrl && <p><a href={authorizationUrl} target="_blank" rel="noreferrer">Authorize Google access</a></p>}{!authorizationUrl && getAdminSignInUrl() && <p><a href={getAdminSignInUrl()} target="_blank" rel="noreferrer">Open Apps Script access and authorization</a></p>}</div>}
-        {loading && !data && <p className="admin-message" role="status">Connecting securely and loading RSVP records…</p>}
+        {!data && <form className="admin-filters" onSubmit={(event) => { event.preventDefault(); void refresh() }}><label htmlFor="admin-code">Admin code<input id="admin-code" value={adminCode} onChange={(event) => setAdminCode(event.target.value)} type="password" autoComplete="current-password" /></label><button className="admin-button" type="submit" disabled={loading}>Open admin page</button></form>}
+        {error && <div className="admin-alert" role="alert"><p>{error}</p></div>}
+        {loading && !data && <p className="admin-message" role="status">Connecting and loading RSVP records…</p>}
         {!loading && !data && !error && <p className="admin-message">Admin data is not configured.</p>}
         {data && section === 'dashboard' && <>
           <div className="admin-metrics">
