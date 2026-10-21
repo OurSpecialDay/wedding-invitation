@@ -12,6 +12,7 @@ function createAppsScript() {
     ['GOOGLE_CLIENT_ID', 'client-id'],
     ['GOOGLE_CLIENT_SECRET', 'client-secret'],
     ['ADMIN_SETUP_PASSPHRASE', 'test-passphrase'],
+    ['ADMIN_ACCESS_CODE', 'test-code'],
     ['ADMIN_ALLOWED_EMAILS', 'admin@example.test'],
     ['ALLOWED_PARENT_ORIGIN', 'https://example.test'],
     ['SPREADSHEET_ID', 'spreadsheet_12345678901234567890'],
@@ -164,40 +165,18 @@ function createAppsScript() {
 }
 
 describe('Apps Script OAuth and Sheets API bridge', () => {
-  it('provides a top-level scope authorization link from the admin sign-in route', () => {
-    const script = createAppsScript()
-    script.context.doGet({ parameter: { admin: 'signin' } })
-    expect(script.signInTemplates[0].authorizationUrl).toBe('https://script.google.com/authorize')
-    expect(script.signInTemplates[0].authorizationStatus).toBe('REQUIRED')
-    expect(script.authorizationInfoCalls[0]).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
-    expect(script.requireScopeCalls[0]).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
-    expect(String(script.signInTemplates[0].content)).toContain('Authorize Google access')
-    expect(script.logs).toContain('RSVP_DIAG: Admin sign-in authorization status=REQUIRED, authorization link available')
-  })
-
-  it('requires Apps Script setup scopes before showing the Sheet connection page', () => {
+  it('shows the Sheet connection page without an extra scope gate', () => {
     const script = createAppsScript()
     const result = script.context.doGet({ parameter: { admin: '1' } }) as { file: string }
     expect(result.file).toBe('Admin')
-    expect(script.requireScopeCalls[0]).toEqual(['FULL', [
-      'https://www.googleapis.com/auth/script.external_request',
-      'https://www.googleapis.com/auth/script.scriptapp',
-    ]])
+    expect(script.requireScopeCalls).toHaveLength(0)
   })
 
-  it('returns the current admin email and allowlist result without reading Sheet data', () => {
+  it('requires the configured admin code before returning admin data', () => {
     const script = createAppsScript()
-    expect(script.context.rsvpAdminGetViewerIdentity()).toEqual({ email: 'admin@example.test', allowed: true })
-    expect(script.requireScopeCalls.at(-1)).toEqual(['FULL', ['https://www.googleapis.com/auth/userinfo.email']])
+    expect(() => script.context.rsvpAdminGetConsoleData('wrong-code')).toThrow(/ADMIN_CODE_INVALID/)
+    expect(script.context.requireAdminViewer_('test-code')).toEqual({ email: '' })
     expect(script.calls).toHaveLength(0)
-    expect(script.logs).toContain('RSVP_DIAG: Admin viewer identity check started')
-    expect(script.logs).toContain('RSVP_DIAG: Admin viewer identity available; allowlisted=true')
-  })
-
-  it('reports a signed-in Google account that is not approved', () => {
-    const script = createAppsScript()
-    script.properties.set('ADMIN_ALLOWED_EMAILS', 'couple@example.test')
-    expect(script.context.rsvpAdminGetViewerIdentity()).toEqual({ email: 'admin@example.test', allowed: false })
   })
 
   it('logs admin bridge acceptance and rejects only with a sanitized reason', () => {

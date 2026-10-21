@@ -14,23 +14,13 @@
       if (!message || message.channel !== channel || message.type !== 'request' || message.nonce !== bridgeNonce || typeof message.id !== 'string') return;
       function sendFailure(error) {
         var messageText = String(error && error.message || '');
-        var errorCode = /userinfo\.email|authorization required|required permissions/i.test(messageText) ? 'authorization_required'
-          : messageText.indexOf('ADMIN_IDENTITY_UNAVAILABLE') >= 0 ? 'identity_unavailable'
-            : messageText.indexOf('ADMIN_ACCOUNT_NOT_ALLOWED') >= 0 ? 'not_allowed' : 'backend';
+        var errorCode = messageText.indexOf('ADMIN_CODE_INVALID') >= 0 ? 'invalid_code' : 'backend';
         parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: false, errorCode: errorCode }, allowedParent);
       }
-      if (message.method === 'getAuthorizationUrl') {
-        google.script.run.withSuccessHandler(function (url) {
-          parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: url || '' }, allowedParent);
-        }).withFailureHandler(sendFailure).rsvpAdminGetAuthorizationUrl();
-      } else if (message.method === 'getViewerIdentity') {
+      if (message.method === 'getAdminData' && typeof message.code === 'string') {
         google.script.run.withSuccessHandler(function (result) {
           parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: result }, allowedParent);
-        }).withFailureHandler(sendFailure).rsvpAdminGetViewerIdentity();
-      } else if (message.method === 'getAdminData') {
-        google.script.run.withSuccessHandler(function (result) {
-          parentWindow.postMessage({ channel: channel, type: 'response', nonce: bridgeNonce, id: message.id, ok: true, result: result }, allowedParent);
-        }).withFailureHandler(sendFailure).rsvpAdminGetConsoleData();
+        }).withFailureHandler(sendFailure).rsvpAdminGetConsoleData(message.code);
       }
     });
   }());

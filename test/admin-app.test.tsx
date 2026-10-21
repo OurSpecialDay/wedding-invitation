@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminApp from '../src/admin/AdminApp'
 import type { AdminData } from '../src/admin/model'
 
-const { getAdminData, getAdminViewerIdentity, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError } = vi.hoisted(() => {
+const { getAdminData, AdminServiceError } = vi.hoisted(() => {
   class MockAdminServiceError extends Error {
     constructor(readonly code: string) { super(code) }
   }
-  return { getAdminData: vi.fn(), getAdminViewerIdentity: vi.fn(), getAdminAuthorizationUrl: vi.fn(), getAdminSignInUrl: vi.fn(), AdminServiceError: MockAdminServiceError }
+  return { getAdminData: vi.fn(), AdminServiceError: MockAdminServiceError }
 })
-vi.mock('../src/admin/adminService', () => ({ getAdminData, getAdminViewerIdentity, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError }))
+vi.mock('../src/admin/adminService', () => ({ getAdminData, AdminServiceError }))
 
 const data: AdminData = {
   viewerEmail: 'admin@example.test',
@@ -30,13 +30,16 @@ describe('admin console', () => {
     if (!HTMLDialogElement.prototype.showModal) HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
     if (!HTMLDialogElement.prototype.close) HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new Event('close')) }
     getAdminData.mockReset().mockResolvedValue(data)
-    getAdminViewerIdentity.mockReset().mockResolvedValue({ email: data.viewerEmail, allowed: true })
-    getAdminAuthorizationUrl.mockReset().mockResolvedValue('https://script.google.com/authorize')
-    getAdminSignInUrl.mockReset().mockReturnValue('https://script.google.com/macros/s/deployment/exec?admin=signin')
   })
+
+  async function enterAdminCode() {
+    fireEvent.change(screen.getByLabelText('Admin code'), { target: { value: 'test-code' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Open admin page' }))
+  }
 
   it('searches guests by invitation name and combines the search with RSVP and attendance filters', async () => {
     render(<AdminApp />)
+    await enterAdminCode()
     await screen.findByText('Invitation groups')
     fireEvent.click(screen.getByRole('button', { name: 'Guest management' }))
     fireEvent.change(screen.getByLabelText('Search guest or invitation'), { target: { value: 'Ediriweera' } })
@@ -49,6 +52,7 @@ describe('admin console', () => {
 
   it('opens an invitation group and displays the stored RSVP answers read-only', async () => {
     render(<AdminApp />)
+    await enterAdminCode()
     await screen.findByText('Invitation groups')
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Admin sections' })).getByRole('button', { name: 'Guest management' }))
     fireEvent.click(screen.getByRole('button', { name: 'Nimali Ediriweera' }))
@@ -62,31 +66,16 @@ describe('admin console', () => {
   it('shows a fail-closed error and no fabricated metrics when authorization/data retrieval fails', async () => {
     getAdminData.mockRejectedValue(new Error('denied'))
     const { container } = render(<AdminApp />)
+    await enterAdminCode()
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Apps Script connected but could not return RSVP data'))
     expect(container.querySelector('.admin-metrics')).toBeNull()
   })
 
-  it('shows the active Google account and blocks data for an unapproved account', async () => {
-    getAdminViewerIdentity.mockResolvedValue({ email: 'other@example.test', allowed: false })
+  it('uses the entered code to request admin data and reports an invalid code', async () => {
+    getAdminData.mockRejectedValue(new AdminServiceError('invalid_code'))
     render(<AdminApp />)
-    expect(await screen.findByText('Google account: other@example.test')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('This Google account is not on the admin allowlist')
-    expect(getAdminData).not.toHaveBeenCalled()
-  })
-
-  it('offers a Google authorization link when the active user has not granted the required scopes', async () => {
-    getAdminData.mockRejectedValue(new AdminServiceError('authorization_required'))
-    render(<AdminApp />)
-    const link = await screen.findByRole('link', { name: 'Authorize Google access' })
-    expect(link).toHaveAttribute('href', 'https://script.google.com/authorize')
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose your admin Google account')
-  })
-
-  it('offers a separate Google sign-in link when the Apps Script bridge cannot start', async () => {
-    getAdminData.mockRejectedValue(new AdminServiceError('connection'))
-    render(<AdminApp />)
-    const link = await screen.findByRole('link', { name: 'Open Apps Script access and authorization' })
-    expect(link).toHaveAttribute('href', 'https://script.google.com/macros/s/deployment/exec?admin=signin')
-    expect(screen.getByRole('alert')).toHaveTextContent('authorize any requested Apps Script permissions')
+    await enterAdminCode()
+    expect(getAdminData).toHaveBeenCalledWith('test-code')
+    expect(await screen.findByRole('alert')).toHaveTextContent('That admin code is incorrect')
   })
 })

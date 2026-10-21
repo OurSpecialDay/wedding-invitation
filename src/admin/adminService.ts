@@ -1,9 +1,8 @@
 import type { AdminData } from './model'
 import { isTrustedAppsScriptOrigin } from '../services/rsvpService'
 
-type AdminErrorCode = 'not_configured' | 'connection' | 'authorization_required' | 'identity_unavailable' | 'authorization_unavailable' | 'not_allowed' | 'backend'
+type AdminErrorCode = 'not_configured' | 'connection' | 'invalid_code' | 'backend'
 type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown; errorCode?: AdminErrorCode }
-export type AdminViewerIdentity = { email: string; allowed: boolean }
 
 export class AdminServiceError extends Error {
   constructor(readonly code: AdminErrorCode) {
@@ -21,29 +20,19 @@ export class AdminService {
 
   constructor(private readonly endpoint: string) {}
 
-  getData(): Promise<AdminData> {
+  getData(code: string): Promise<AdminData> {
     if (!this.endpoint) return Promise.reject(new AdminServiceError('not_configured'))
     if (this.dataRequest) return this.dataRequest
-    this.dataRequest = this.loadData().finally(() => { this.dataRequest = null })
+    this.dataRequest = this.loadData(code).finally(() => { this.dataRequest = null })
     return this.dataRequest
   }
 
-  async getAuthorizationUrl(): Promise<string> {
+  private async loadData(code: string): Promise<AdminData> {
     await this.connect()
-    return this.request<string>('getAuthorizationUrl')
+    return this.request<AdminData>('getAdminData', code, isAdminData)
   }
 
-  async getViewerIdentity(): Promise<AdminViewerIdentity> {
-    await this.connect()
-    return this.request<AdminViewerIdentity>('getViewerIdentity', isAdminViewerIdentity)
-  }
-
-  private async loadData(): Promise<AdminData> {
-    await this.connect()
-    return this.request<AdminData>('getAdminData', isAdminData)
-  }
-
-  private request<T>(method: 'getAdminData' | 'getAuthorizationUrl' | 'getViewerIdentity', validate?: (value: unknown) => value is T): Promise<T> {
+  private request<T>(method: 'getAdminData', code: string, validate?: (value: unknown) => value is T): Promise<T> {
     return new Promise((resolve, reject) => {
       const id = window.crypto.randomUUID()
       let timer: number
@@ -63,7 +52,7 @@ export class AdminService {
       }, 20_000)
       window.addEventListener('message', response)
       try {
-        this.remoteWindow?.postMessage({ channel: 'wedding-rsvp-admin-bridge', type: 'request', nonce: this.nonce, id, method }, this.origin!)
+        this.remoteWindow?.postMessage({ channel: 'wedding-rsvp-admin-bridge', type: 'request', nonce: this.nonce, id, method, code }, this.origin!)
       } catch {
         window.clearTimeout(timer)
         window.removeEventListener('message', response)
@@ -114,25 +103,5 @@ function isAdminData(value: unknown): value is AdminData {
     && candidate.responses.every((row) => row && (row.invitationKey === null || typeof row.invitationKey === 'string') && Array.isArray(row.guests) && (row.attending === null || typeof row.attending === 'boolean') && row.guests.every((guest) => guest && typeof guest.name === 'string'))
 }
 
-function isAdminViewerIdentity(value: unknown): value is AdminViewerIdentity {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<AdminViewerIdentity>
-  return typeof candidate.email === 'string' && typeof candidate.allowed === 'boolean'
-}
-
 const service = new AdminService(import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? '')
-export const getAdminData = () => service.getData()
-export const getAdminViewerIdentity = () => service.getViewerIdentity()
-export const getAdminAuthorizationUrl = () => service.getAuthorizationUrl()
-export function getAdminSignInUrl(): string {
-  const endpoint = import.meta.env.VITE_RSVP_ADMIN_URL?.trim()
-  if (!endpoint) return ''
-  try {
-    const url = new URL(endpoint)
-    url.search = ''
-    url.searchParams.set('admin', 'signin')
-    return url.toString()
-  } catch {
-    return ''
-  }
-}
+export const getAdminData = (code: string) => service.getData(code)
