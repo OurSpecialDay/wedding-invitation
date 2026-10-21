@@ -26,6 +26,7 @@ function createAppsScript() {
   let responses: unknown[][] = [responseHeaders]
   const calls: Array<{ url: string; options: Record<string, unknown> }> = []
   const bridgeTemplates: Array<Record<string, unknown>> = []
+  const signInTemplates: Array<Record<string, unknown>> = []
   const scriptCache = new Map<string, string>()
   let googleStatus = 200
   let refreshResult: Record<string, unknown> = { access_token: 'fresh-access-token', expires_in: 3600 }
@@ -44,6 +45,9 @@ function createAppsScript() {
     },
     ScriptApp: {
       getService: () => ({ getUrl: () => 'https://script.google.com/macros/s/test-deployment/exec' }),
+      AuthMode: { FULL: 'FULL' },
+      AuthorizationStatus: { NOT_REQUIRED: 'NOT_REQUIRED', REQUIRED: 'REQUIRED' },
+      getAuthorizationInfo: () => ({ getAuthorizationUrl: () => 'https://script.google.com/authorize', getAuthorizationStatus: () => 'REQUIRED' }),
       getScriptId: () => 'test-script-id',
       newStateToken: () => {
         const builder = {
@@ -110,6 +114,11 @@ function createAppsScript() {
     HtmlService: {
       createHtmlOutput: (content: string) => ({ content, setTitle: function () { return this } }),
       createHtmlOutputFromFile: (file: string) => ({ file, setTitle: function () { return this } }),
+      createTemplate: (content: string) => {
+        const template: Record<string, unknown> = { content, evaluate: () => ({ content, setTitle: function () { return this } }) }
+        signInTemplates.push(template)
+        return template
+      },
       createTemplateFromFile: () => {
         const template: Record<string, unknown> = { evaluate: () => ({ setXFrameOptionsMode: () => ({}) }) }
         bridgeTemplates.push(template)
@@ -129,6 +138,7 @@ function createAppsScript() {
     properties,
     calls,
     bridgeTemplates,
+    signInTemplates,
     setRefreshResult: (value: Record<string, unknown>) => { refreshResult = value },
     setAuthorizationResult: (value: Record<string, unknown>) => { authorizationResult = value },
     setGoogleStatus: (value: number) => { googleStatus = value },
@@ -140,6 +150,14 @@ function createAppsScript() {
 }
 
 describe('Apps Script OAuth and Sheets API bridge', () => {
+  it('provides a top-level scope authorization link from the admin sign-in route', () => {
+    const script = createAppsScript()
+    script.context.doGet({ parameter: { admin: 'signin' } })
+    expect(script.signInTemplates[0].authorizationUrl).toBe('https://script.google.com/authorize')
+    expect(script.signInTemplates[0].authorizationStatus).toBe('REQUIRED')
+    expect(String(script.signInTemplates[0].content)).toContain('Authorize Google access')
+  })
+
   it('serves the bridge with its configured parent origin and per-load nonce', () => {
     const script = createAppsScript()
     script.context.doGet({ parameter: {
