@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminApp from '../src/admin/AdminApp'
 import type { AdminData } from '../src/admin/model'
 
-const { getAdminData, getAdminAuthorizationUrl, AdminServiceError } = vi.hoisted(() => {
+const { getAdminData, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError } = vi.hoisted(() => {
   class MockAdminServiceError extends Error {
     constructor(readonly code: string) { super(code) }
   }
-  return { getAdminData: vi.fn(), getAdminAuthorizationUrl: vi.fn(), AdminServiceError: MockAdminServiceError }
+  return { getAdminData: vi.fn(), getAdminAuthorizationUrl: vi.fn(), getAdminSignInUrl: vi.fn(), AdminServiceError: MockAdminServiceError }
 })
-vi.mock('../src/admin/adminService', () => ({ getAdminData, getAdminAuthorizationUrl, AdminServiceError }))
+vi.mock('../src/admin/adminService', () => ({ getAdminData, getAdminAuthorizationUrl, getAdminSignInUrl, AdminServiceError }))
 
 const data: AdminData = {
   invitations: [
@@ -30,6 +30,7 @@ describe('admin console', () => {
     if (!HTMLDialogElement.prototype.close) HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); this.dispatchEvent(new Event('close')) }
     getAdminData.mockReset().mockResolvedValue(data)
     getAdminAuthorizationUrl.mockReset().mockResolvedValue('https://script.google.com/authorize')
+    getAdminSignInUrl.mockReset().mockReturnValue('https://script.google.com/macros/s/deployment/exec?admin=signin')
   })
 
   it('searches guests by invitation name and combines the search with RSVP and attendance filters', async () => {
@@ -69,5 +70,13 @@ describe('admin console', () => {
     const link = await screen.findByRole('link', { name: 'Authorize Google access' })
     expect(link).toHaveAttribute('href', 'https://script.google.com/authorize')
     expect(screen.getByRole('alert')).toHaveTextContent('Choose your admin Google account')
+  })
+
+  it('offers a separate Google sign-in link when the Apps Script bridge cannot start', async () => {
+    getAdminData.mockRejectedValue(new AdminServiceError('connection'))
+    render(<AdminApp />)
+    const link = await screen.findByRole('link', { name: 'Open Google account access' })
+    expect(link).toHaveAttribute('href', 'https://script.google.com/macros/s/deployment/exec?admin=signin')
+    expect(screen.getByRole('alert')).toHaveTextContent('Sign in to Google with the approved admin account')
   })
 })

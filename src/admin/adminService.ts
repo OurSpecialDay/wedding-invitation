@@ -111,3 +111,15 @@ function isAdminData(value: unknown): value is AdminData {
 const service = new AdminService(import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? '')
 export const getAdminData = () => service.getData()
 export const getAdminAuthorizationUrl = () => service.getAuthorizationUrl()
+export function getAdminSignInUrl(): string {
+  const endpoint = import.meta.env.VITE_RSVP_ADMIN_URL?.trim()
+  if (!endpoint) return ''
+  try {
+    const url = new URL(endpoint)
+    url.search = ''
+    url.searchParams.set('admin', 'signin')
+    return url.toString()
+  } catch {
+    return ''
+  }
+}
