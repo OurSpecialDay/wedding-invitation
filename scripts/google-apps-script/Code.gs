@@ -13,12 +13,31 @@ function doGet(e) {
     return HtmlService.createHtmlOutputFromFile('Admin').setTitle('RSVP Sheet setup');
   }
   if (e && e.parameter && e.parameter.admin === 'signin') {
-    return HtmlService.createHtmlOutput(
-      '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin sign-in</title></head>' +
+    var authorizationUrl = '';
+    var authorizationStatus = 'unavailable';
+    try {
+      var authorizationInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+      authorizationUrl = authorizationInfo.getAuthorizationUrl() || '';
+      authorizationStatus = String(authorizationInfo.getAuthorizationStatus());
+    } catch (error) {
+      console.error('RSVP_DIAG: Admin authorization status could not be checked');
+    }
+    var signInPage = HtmlService.createTemplate(
+      '<!doctype html><html><head><base target="_top"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin sign-in</title></head>' +
       '<body style="font:16px Arial,sans-serif;max-width:38rem;margin:4rem auto;padding:0 1rem;line-height:1.5">' +
-      '<h1>Google account access is ready</h1><p>Return to the wedding admin page and choose Refresh data. Use the approved admin Google account in this browser.</p>' +
-      '<p>If Google showed an authorization prompt, complete it before returning.</p></body></html>'
-    ).setTitle('Wedding RSVP admin sign-in');
+      '<h1>Google account access is ready</h1><p>Use the approved admin Google account in this browser.</p>' +
+      '<? if (authorizationUrl) { ?>' +
+      '<p>Authorize the Apps Script permissions required by the admin console:</p><p><a href="<?= authorizationUrl ?>">Authorize Google access</a></p>' +
+      '<p>After Google confirms authorization, return to the wedding admin page and choose Refresh data.</p>' +
+      '<? } else if (authorizationStatus === "NOT_REQUIRED") { ?>' +
+      '<p>Apps Script permissions are already granted. Return to the wedding admin page and choose Refresh data.</p>' +
+      '<? } else { ?>' +
+      '<p>Apps Script could not provide an authorization link. Return to the wedding admin page and refresh. If the connection still fails, ask the site owner to check the Apps Script deployment and execution details.</p>' +
+      '<? } ?></body></html>'
+    );
+    signInPage.authorizationUrl = authorizationUrl;
+    signInPage.authorizationStatus = authorizationStatus;
+    return signInPage.evaluate().setTitle('Wedding RSVP admin sign-in');
   }
   if (e && e.parameter && e.parameter.admin === 'console') {
     var parentOrigin = properties.getProperty('ALLOWED_PARENT_ORIGIN');

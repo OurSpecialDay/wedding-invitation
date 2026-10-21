@@ -75,8 +75,8 @@ describe('admin console', () => {
   it('offers a separate Google sign-in link when the Apps Script bridge cannot start', async () => {
     getAdminData.mockRejectedValue(new AdminServiceError('connection'))
     render(<AdminApp />)
-    const link = await screen.findByRole('link', { name: 'Open Google account access' })
+    const link = await screen.findByRole('link', { name: 'Open Apps Script access and authorization' })
     expect(link).toHaveAttribute('href', 'https://script.google.com/macros/s/deployment/exec?admin=signin')
-    expect(screen.getByRole('alert')).toHaveTextContent('Sign in to Google with the approved admin account')
+    expect(screen.getByRole('alert')).toHaveTextContent('authorize any requested Apps Script permissions')
   })
 })

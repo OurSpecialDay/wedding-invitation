@@ -51,7 +51,7 @@ export default function AdminApp() {
       } else if (code === 'identity_unavailable') {
         setError('Google did not provide an email address for this session. Sign in with an approved account and confirm the admin deployment runs as the user accessing it.')
       } else if (code === 'connection') {
-        setError('The admin connection did not start. Sign in to Google with the approved admin account in this browser, then return here and refresh. If you are already signed in, ask the site owner to check the admin deployment URL, access setting, and allowed site origin.')
+        setError('The admin connection did not start. Open the Apps Script access page, sign in with the approved admin account, and authorize any requested Apps Script permissions. Then return here and refresh. If no authorization link appears or the connection still fails, ask the site owner to check the admin deployment and allowed site origin.')
       } else if (code === 'not_configured') {
         setError('The admin Apps Script deployment URL is not configured in this site build.')
       } else {
@@ -122,7 +122,7 @@ export default function AdminApp() {
       <nav className="admin-nav" aria-label="Admin sections">{(['dashboard', 'guests', 'reports'] as const).map((item) => <button type="button" key={item} aria-current={section === item ? 'page' : undefined} onClick={() => go(item)}>{item === 'guests' ? 'Guest management' : item[0].toUpperCase() + item.slice(1)}</button>)}</nav>
       <section id="admin-content" className="admin-main" aria-live="polite">
         <div className="admin-page-title"><div><p className="admin-eyebrow">Wedding RSVP</p><h1>{section === 'guests' ? 'Guest management' : section[0].toUpperCase() + section.slice(1)}</h1></div></div>
-        {error && <div className="admin-alert" role="alert"><p>{error}</p>{authorizationUrl && <p><a href={authorizationUrl} target="_blank" rel="noreferrer">Authorize Google access</a></p>}{!authorizationUrl && getAdminSignInUrl() && <p><a href={getAdminSignInUrl()} target="_blank" rel="noreferrer">Open Google account access</a></p>}</div>}
+        {error && <div className="admin-alert" role="alert"><p>{error}</p>{authorizationUrl && <p><a href={authorizationUrl} target="_blank" rel="noreferrer">Authorize Google access</a></p>}{!authorizationUrl && getAdminSignInUrl() && <p><a href={getAdminSignInUrl()} target="_blank" rel="noreferrer">Open Apps Script access and authorization</a></p>}</div>}
         {loading && !data && <p className="admin-message" role="status">Connecting securely and loading RSVP records…</p>}
         {!loading && !data && !error && <p className="admin-message">Admin data is not configured.</p>}
         {data && section === 'dashboard' && <>
