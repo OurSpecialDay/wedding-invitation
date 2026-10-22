@@ -103,5 +103,5 @@ function isAdminData(value: unknown): value is AdminData {
     && candidate.responses.every((row) => row && (row.invitationKey === null || typeof row.invitationKey === 'string') && Array.isArray(row.guests) && (row.attending === null || typeof row.attending === 'boolean') && row.guests.every((guest) => guest && typeof guest.name === 'string'))
 }
 
-const service = new AdminService(import.meta.env.VITE_RSVP_ADMIN_URL?.trim() ?? '')
+const service = new AdminService(import.meta.env.VITE_RSVP_BRIDGE_URL?.trim() ?? '')
 export const getAdminData = (code: string) => service.getData(code)
