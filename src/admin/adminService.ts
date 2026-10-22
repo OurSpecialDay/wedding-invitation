@@ -5,7 +5,7 @@ type AdminErrorCode = 'not_configured' | 'connection' | 'invalid_code' | 'invali
 type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown; errorCode?: AdminErrorCode }
 
 export class AdminServiceError extends Error {
-  constructor(readonly code: AdminErrorCode) {
+  constructor(readonly code: AdminErrorCode, readonly detail = '') {
     super(code)
     this.name = 'AdminServiceError'
   }
@@ -43,8 +43,8 @@ export class AdminService {
         window.clearTimeout(timer)
         window.removeEventListener('message', response)
         if (!message.ok) reject(new AdminServiceError(message.errorCode ?? 'backend'))
-        else if (validate && !validate(message.result)) reject(new AdminServiceError('invalid_response'))
-        else resolve(message.result as T)
+        else if (validate && !validate(message.result)) reject(new AdminServiceError('invalid_response', adminDataShapeProblem(message.result)))
+        else resolve((validate === isAdminData ? normalizeAdminData(message.result as AdminData) : message.result) as T)
       }
       timer = window.setTimeout(() => {
         window.removeEventListener('message', response)
@@ -99,8 +99,49 @@ function isAdminData(value: unknown): value is AdminData {
   const candidate = value as Partial<AdminData>
   return Array.isArray(candidate.invitations) && Array.isArray(candidate.responses)
     && typeof candidate.viewerEmail === 'string' && typeof candidate.duplicateResponseCount === 'number' && typeof candidate.orphanResponseCount === 'number'
-    && candidate.invitations.every((row) => row && typeof row.invitationKey === 'string' && typeof row.primaryGuestName === 'string' && typeof row.active === 'boolean' && (row.maxGuests === null || typeof row.maxGuests === 'number') && (row.invitedGuestNames === null || (Array.isArray(row.invitedGuestNames) && row.invitedGuestNames.every((name) => typeof name === 'string'))))
-    && candidate.responses.every((row) => row && (row.invitationKey === null || typeof row.invitationKey === 'string') && Array.isArray(row.guests) && (row.attending === null || typeof row.attending === 'boolean') && row.guests.every((guest) => guest && typeof guest.name === 'string'))
+    && candidate.invitations.every((row) => row && typeof row.invitationKey === 'string' && typeof row.primaryGuestName === 'string' && typeof row.active === 'boolean' && (row.maxGuests == null || typeof row.maxGuests === 'number') && (row.invitedGuestNames == null || (Array.isArray(row.invitedGuestNames) && row.invitedGuestNames.every((name) => typeof name === 'string'))))
+    && candidate.responses.every((row) => row && (row.invitationKey == null || typeof row.invitationKey === 'string') && Array.isArray(row.guests) && (row.attending == null || typeof row.attending === 'boolean') && row.guests.every((guest) => guest && typeof guest.name === 'string'))
+}
+
+function normalizeAdminData(data: AdminData): AdminData {
+  return {
+    ...data,
+    invitations: data.invitations.map((row) => ({ ...row, maxGuests: row.maxGuests ?? null, invitedGuestNames: row.invitedGuestNames ?? null })),
+    responses: data.responses.map((row) => ({ ...row, invitationKey: row.invitationKey ?? null, attending: row.attending ?? null })),
+  }
+}
+
+function adminDataShapeProblem(value: unknown): string {
+  const kind = (item: unknown) => item === null ? 'null' : Array.isArray(item) ? 'array' : typeof item
+  if (!value || typeof value !== 'object') return `Expected an object; received ${kind(value)}.`
+  const candidate = value as Record<string, unknown>
+  if (!Array.isArray(candidate.invitations)) return `Expected invitations to be an array; received ${kind(candidate.invitations)}.`
+  if (!Array.isArray(candidate.responses)) return `Expected responses to be an array; received ${kind(candidate.responses)}.`
+  if (typeof candidate.viewerEmail !== 'string') return `Expected viewerEmail to be a string; received ${kind(candidate.viewerEmail)}.`
+  if (typeof candidate.duplicateResponseCount !== 'number') return `Expected duplicateResponseCount to be a number; received ${kind(candidate.duplicateResponseCount)}.`
+  if (typeof candidate.orphanResponseCount !== 'number') return `Expected orphanResponseCount to be a number; received ${kind(candidate.orphanResponseCount)}.`
+  const invitation = candidate.invitations.find((row) => !row || typeof row !== 'object' || typeof (row as Record<string, unknown>).invitationKey !== 'string' || typeof (row as Record<string, unknown>).primaryGuestName !== 'string' || typeof (row as Record<string, unknown>).active !== 'boolean' || ((row as Record<string, unknown>).maxGuests != null && typeof (row as Record<string, unknown>).maxGuests !== 'number') || ((row as Record<string, unknown>).invitedGuestNames != null && (!Array.isArray((row as Record<string, unknown>).invitedGuestNames) || ((row as Record<string, unknown>).invitedGuestNames as unknown[]).some((name) => typeof name !== 'string'))))
+  if (invitation) {
+    const row = invitation as Record<string, unknown>
+    for (const key of ['invitationKey', 'primaryGuestName', 'active', 'maxGuests', 'invitedGuestNames'] as const) {
+      const field = row[key]
+      const valid = key === 'invitationKey' || key === 'primaryGuestName' ? typeof field === 'string'
+        : key === 'active' ? typeof field === 'boolean'
+          : key === 'maxGuests' ? field == null || typeof field === 'number'
+            : field == null || (Array.isArray(field) && field.every((name) => typeof name === 'string'))
+      if (!valid) return `Expected invitations[].${key} to have its documented type; received ${kind(field)}.`
+    }
+    return 'An invitation row is missing or malformed.'
+  }
+  const response = candidate.responses.find((row) => !row || typeof row !== 'object' || !((row as Record<string, unknown>).invitationKey == null || typeof (row as Record<string, unknown>).invitationKey === 'string') || !Array.isArray((row as Record<string, unknown>).guests) || !((row as Record<string, unknown>).attending == null || typeof (row as Record<string, unknown>).attending === 'boolean') || !((row as Record<string, unknown>).guests as unknown[]).every((guest) => guest && typeof guest === 'object' && typeof (guest as Record<string, unknown>).name === 'string'))
+  if (response) {
+    const row = response as Record<string, unknown>
+    if (row.invitationKey != null && typeof row.invitationKey !== 'string') return `Expected responses[].invitationKey to be a string or null; received ${kind(row.invitationKey)}.`
+    if (!Array.isArray(row.guests)) return `Expected responses[].guests to be an array; received ${kind(row.guests)}.`
+    if (row.attending != null && typeof row.attending !== 'boolean') return `Expected responses[].attending to be a boolean or null; received ${kind(row.attending)}.`
+    return 'A response row is malformed.'
+  }
+  return 'The response contains an unexpected field shape.'
 }
 
 const service = new AdminService(import.meta.env.VITE_RSVP_BRIDGE_URL?.trim() ?? '')
