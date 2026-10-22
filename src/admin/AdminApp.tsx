@@ -36,6 +36,8 @@ export default function AdminApp() {
       const code = requestError instanceof AdminServiceError ? requestError.code : 'backend'
       if (code === 'invalid_code') {
         setError('That admin code is incorrect. Try again.')
+      } else if (code === 'invalid_response') {
+        setError('Apps Script returned RSVP data in a format this admin page cannot use. Update Code.gs and AdminBridge.html in the Apps Script deployment, then rebuild and redeploy this site.')
       } else if (code === 'connection') {
         setError('The admin connection could not start. Check the Apps Script deployment URL and allowed site origin.')
       } else if (code === 'not_configured') {
