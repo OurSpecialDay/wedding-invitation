@@ -1,7 +1,7 @@
 import type { AdminData } from './model'
 import { isTrustedAppsScriptOrigin } from '../services/rsvpService'
 
-type AdminErrorCode = 'not_configured' | 'connection' | 'invalid_code' | 'backend'
+type AdminErrorCode = 'not_configured' | 'connection' | 'invalid_code' | 'invalid_response' | 'backend'
 type Envelope = { channel: 'wedding-rsvp-admin-bridge'; type: 'ready' | 'response'; nonce: string; id?: string; ok?: boolean; result?: unknown; errorCode?: AdminErrorCode }
 
 export class AdminServiceError extends Error {
@@ -43,7 +43,7 @@ export class AdminService {
         window.clearTimeout(timer)
         window.removeEventListener('message', response)
         if (!message.ok) reject(new AdminServiceError(message.errorCode ?? 'backend'))
-        else if (validate && !validate(message.result)) reject(new AdminServiceError('backend'))
+        else if (validate && !validate(message.result)) reject(new AdminServiceError('invalid_response'))
         else resolve(message.result as T)
       }
       timer = window.setTimeout(() => {
