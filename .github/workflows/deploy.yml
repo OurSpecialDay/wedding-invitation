@@ -32,7 +32,6 @@ jobs:
       - name: Build site
         env:
           VITE_RSVP_BRIDGE_URL: ${{ vars.VITE_RSVP_BRIDGE_URL }}
-          VITE_RSVP_ADMIN_URL: ${{ vars.VITE_RSVP_ADMIN_URL }}
         run: npm run build
       - name: Configure Pages
         uses: actions/configure-pages@v5
